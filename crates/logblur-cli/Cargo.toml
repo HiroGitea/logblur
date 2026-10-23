@@ -1,0 +1,18 @@
+[package]
+name = "logblur-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+
+[[bin]]
+name = "logblur"
+path = "src/main.rs"
+
+[dependencies]
+logblur-core.workspace = true
+clap = { version = "4.6", features = ["derive", "wrap_help"] }
+indicatif = "0.18"
+sys-locale = "0.3"
+ctrlc = "3.5"

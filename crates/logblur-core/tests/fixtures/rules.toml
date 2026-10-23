@@ -1,0 +1,323 @@
+# 规则夹具：每个 case 用 tag 打码模式清洗 input，
+# masked 里的子串必须从输出中消失，kept 里的子串必须保留，tags 里的标签必须出现。
+# 所有数据都是虚构的（RFC 5737 文档地址、测试卡号、示例证件号）。
+
+[[case]]
+name = "sshd invalid user"
+level = 3
+input = "Oct 23 11:12:13 web-prod-01 sshd[2211]: Failed password for invalid user admin2 from 203.0.113.45 port 52234 ssh2"
+masked = ["web-prod-01", "admin2", "203.0.113.45"]
+kept = ["sshd[2211]", "Failed password for invalid user", "port 52234", "ssh2"]
+tags = ["HOST", "USER", "IPV4"]
+
+[[case]]
+name = "sshd accepted publickey with fingerprint"
+level = 3
+input = "Oct 23 11:15:02 web-prod-01 sshd[2301]: Accepted publickey for alice from 198.51.100.7 port 50122 ssh2: ED25519 SHA256:Hx2b1QKcOoa1L3dHmC7yJ4z5eQ8mN0pR6sT9uV2wX3Y"
+masked = ["alice", "198.51.100.7", "Hx2b1QKc"]
+kept = ["Accepted publickey for", "port 50122", "ED25519 SHA256:"]
+tags = ["SSH_KEY", "USER", "IPV4"]
+
+[[case]]
+name = "level 2 keeps network identifiers"
+level = 2
+input = "Oct 23 11:15:02 web-prod-01 sshd[2301]: Accepted publickey for alice from 198.51.100.7 port 50122 ssh2: ED25519 SHA256:Hx2b1QKcOoa1L3dHmC7yJ4z5eQ8mN0pR6sT9uV2wX3Y"
+masked = ["Hx2b1QKc"]
+kept = ["web-prod-01", "alice", "198.51.100.7"]
+
+[[case]]
+name = "sudo"
+level = 3
+input = "Oct 23 11:20:41 web-prod-01 sudo:    alice : TTY=pts/0 ; PWD=/home/alice/projects ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx"
+masked = ["alice"]
+kept = ["USER=root", "COMMAND=/usr/bin/systemctl restart nginx", "PWD=/home/", "/projects"]
+
+[[case]]
+name = "sudo PWD is not a password at level 1"
+level = 1
+input = "sudo:    alice : TTY=pts/0 ; PWD=/home/alice/projects ; USER=root ; COMMAND=/bin/ls"
+kept = ["PWD=/home/alice/projects", "alice"]
+
+[[case]]
+name = "pam session by uid"
+level = 3
+input = "Oct 23 11:20:41 web-prod-01 sudo: pam_unix(sudo:session): session opened for user root(uid=0) by alice(uid=1000)"
+masked = ["alice"]
+kept = ["session opened for user root(uid=0)", "(uid=1000)"]
+
+[[case]]
+name = "iptables log line"
+level = 3
+input = "Oct 23 11:30:00 fw01 kernel: [ 1234.567890] IN=eth0 OUT= MAC=ff:ff:ff:ff:ff:ff:52:54:00:12:34:56:08:00 SRC=192.0.2.33 DST=192.0.2.255 LEN=78 TOS=0x00 PROTO=UDP SPT=137 DPT=137 LEN=58"
+masked = ["52:54:00:12:34:56", "192.0.2.33", "192.0.2.255", "fw01"]
+kept = ["IN=eth0", "PROTO=UDP", "SPT=137", "[ 1234.567890]"]
+
+[[case]]
+name = "NetworkManager connection and uuid"
+level = 3
+input = "Oct 23 09:00:01 alice-laptop NetworkManager[812]: <info>  [1698051601.1234] device (wlp2s0): Activation: starting connection 'CoffeeShop-5G' (3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b)"
+masked = ["alice-laptop", "CoffeeShop-5G", "3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b"]
+kept = ["device (wlp2s0)", "Activation: starting connection", "[1698051601.1234]"]
+tags = ["SSID", "UUID"]
+
+[[case]]
+name = "wpa_supplicant ssid and bssid"
+level = 3
+input = "wlp2s0: Trying to associate with SSID 'HomeNet-2.4G' and bssid 9c:53:22:aa:bb:cc"
+masked = ["HomeNet-2.4G", "9c:53:22:aa:bb:cc"]
+kept = ["Trying to associate with SSID"]
+
+[[case]]
+name = "wired connection names are kept"
+level = 3
+input = "device (enp3s0): Activation: starting connection 'Wired connection 1'"
+kept = ["'Wired connection 1'"]
+
+[[case]]
+name = "journal export fields"
+level = 3
+input = "_HOSTNAME=db-master-7\n_MACHINE_ID=4c1f9e2a7b3d4e5f8a9b0c1d2e3f4a5b\n_BOOT_ID=0f1e2d3c4b5a69788796a5b4c3d2e1f0\nMESSAGE=Started Session 4 of User bob."
+masked = ["db-master-7", "4c1f9e2a7b3d4e5f8a9b0c1d2e3f4a5b", "0f1e2d3c4b5a69788796a5b4c3d2e1f0", "bob"]
+kept = ["_HOSTNAME=", "_MACHINE_ID=", "MESSAGE=Started Session 4 of User "]
+
+[[case]]
+name = "dmesg serial number at level 3"
+level = 3
+input = "[    2.345678] usb 1-1.2: New USB device found, idVendor=0781, idProduct=5581, bcdDevice= 1.00\n[    2.345700] usb 1-1.2: SerialNumber: 4C530001230915117283\n[    0.512345] pci 0000:00:1f.6: [8086:15fa] type 00 class 0x020000"
+masked = ["4C530001230915117283"]
+kept = ["0000:00:1f.6", "idVendor=0781", "[8086:15fa]", "usb 1-1.2"]
+
+[[case]]
+name = "PCI address and USB ids only at level 4"
+level = 4
+input = "[    2.345678] usb 1-1.2: New USB device found, idVendor=0781, idProduct=5581\n[    0.512345] pci 0000:00:1f.6: [8086:15fa] type 00 class 0x020000"
+masked = ["0000:00:1f.6", "0781", "5581", "8086:15fa"]
+tags = ["HW_ID"]
+
+[[case]]
+name = "kernel banner build host"
+level = 3
+input = "[    0.000000] Linux version 6.1.0-13-amd64 (alice@alice-build) (gcc-12 (Debian 12.2.0-14) 12.2.0) #1 SMP"
+masked = ["alice@alice-build"]
+kept = ["Linux version 6.1.0-13-amd64", "gcc-12", "12.2.0-14"]
+
+[[case]]
+name = "nginx access log"
+level = 3
+input = "203.0.113.9 - bob [23/Oct/2026:11:12:13 +0800] \"GET /api/v1/orders?token=9f8e7d6c5b4a39281706&page=2 HTTP/1.1\" 200 512 \"https://shop.acme-corp.cn/cart\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36\""
+masked = ["203.0.113.9", "9f8e7d6c5b4a39281706", "shop.acme-corp.cn"]
+kept = ["GET /api/v1/orders?token=", "page=2", "Mozilla/5.0 (X11; Linux x86_64)", "/cart"]
+
+[[case]]
+name = "user agent at level 4"
+level = 4
+input = "\"GET / HTTP/1.1\" 200 512 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36\""
+masked = ["Mozilla/5.0 (X11"]
+tags = ["USER_AGENT"]
+
+[[case]]
+name = "application secrets at level 1"
+level = 1
+input = "2026-10-23T11:12:13.456Z INFO db connect url=postgres://app_user:S3cr3t!pass@10.20.30.40:5432/orders password=\"p@ss w0rd\" api_key=AKIAIOSFODNN7EXAMPLE"
+masked = ["S3cr3t!pass", "p@ss w0rd", "AKIAIOSFODNN7EXAMPLE"]
+kept = ["10.20.30.40", "app_user", "postgres://", "2026-10-23T11:12:13.456Z"]
+
+[[case]]
+name = "application secrets at level 3"
+level = 3
+input = "db connect url=postgres://app_user:S3cr3t!pass@10.20.30.40:5432/orders"
+masked = ["S3cr3t!pass", "app_user", "10.20.30.40"]
+kept = ["postgres://", ":5432/orders"]
+
+[[case]]
+name = "authorization bearer jwt"
+level = 1
+input = "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+masked = ["eyJhbGciOiJIUzI1NiJ9", "dozjgNryP4J3jVmNHl0w5N"]
+kept = ["Authorization: Bearer "]
+tags = ["TOKEN"]
+
+[[case]]
+name = "pem private key block"
+level = 1
+input = "key loaded:\n-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ\nAAAAAAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5\n-----END OPENSSH PRIVATE KEY-----\ndone"
+masked = ["b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ", "AAAAAAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5"]
+kept = ["-----BEGIN OPENSSH PRIVATE KEY-----", "-----END OPENSSH PRIVATE KEY-----", "done"]
+tags = ["PRIVATE_KEY"]
+
+[[case]]
+name = "chinese personal data"
+level = 2
+input = "用户 张三 手机号：13800138000，身份证 11010519491231002X，邮箱 zhangsan@acme-corp.cn，车牌 京A12345，银行卡 6222 0212 3456 7894"
+masked = ["13800138000", "11010519491231002X", "zhangsan@acme-corp.cn", "京A12345", "6222 0212 3456 7894"]
+kept = ["手机号：", "身份证", "邮箱", "车牌", "银行卡"]
+tags = ["PHONE", "ID_CARD", "EMAIL", "PLATE", "BANK_CARD"]
+
+[[case]]
+name = "version numbers are not IP addresses"
+level = 3
+input = "openjdk version 17.0.8.1 running; agent v1.2.3.4 started; upgraded nginx to version 1.24.0.1; 1.2.3.4.5 is not an address"
+kept = ["17.0.8.1", "v1.2.3.4", "1.24.0.1", "1.2.3.4.5"]
+
+[[case]]
+name = "sizes and timestamps are not phone numbers"
+level = 2
+input = "ts=1698062400123 size=15032385536 epoch 1698062400"
+kept = ["1698062400123", "15032385536", "1698062400"]
+
+[[case]]
+name = "level 4 masks long numbers but not timestamps"
+level = 4
+input = "ts=1698062400123 size=15032385536 epoch 1698062400"
+masked = ["15032385536"]
+kept = ["1698062400123", "1698062400"]
+
+[[case]]
+name = "systemd units are not e-mail addresses"
+level = 3
+input = "Oct 23 10:00:00 web-prod-01 systemd[1]: Started user@1000.service - User Manager for UID 1000."
+masked = ["web-prod-01"]
+kept = ["user@1000.service", "User Manager for UID 1000."]
+
+[[case]]
+name = "public dns and loopback are kept"
+level = 3
+input = "nameserver 8.8.8.8 via 192.168.1.1 dev wlan0; listening on 127.0.0.1:631 and 0.0.0.0:22"
+masked = ["192.168.1.1"]
+kept = ["8.8.8.8", "127.0.0.1:631", "0.0.0.0:22", "dev wlan0"]
+
+[[case]]
+name = "private addresses kept on request"
+level = 3
+keep_private_ips = true
+input = "nameserver 8.8.8.8 via 192.168.1.1 dev wlan0, peer 203.0.113.80"
+masked = ["203.0.113.80"]
+kept = ["192.168.1.1"]
+
+[[case]]
+name = "ipv6"
+level = 3
+input = "peer [fe80::1ff:fe23:4567:890a%eth0]:22 and 2001:db8:85a3::8a2e:370:7334 loopback ::1 at 11:12:13"
+masked = ["fe80::1ff:fe23:4567:890a", "2001:db8:85a3::8a2e:370:7334"]
+kept = ["loopback ::1", "at 11:12:13", "]:22"]
+tags = ["IPV6"]
+
+[[case]]
+name = "mac formats"
+level = 3
+input = "ether 52:54:00:ab:cd:ef brd ff:ff:ff:ff:ff:ff; cisco 0050.56c0.0001; win 00-1A-2B-3C-4D-5E"
+masked = ["52:54:00:ab:cd:ef", "0050.56c0.0001", "00-1A-2B-3C-4D-5E"]
+kept = ["brd ff:ff:ff:ff:ff:ff"]
+tags = ["MAC"]
+
+[[case]]
+name = "home paths"
+level = 3
+input = "open /home/bob/.ssh/id_rsa failed; C:\\Users\\Carol\\AppData; ~dave/.bashrc"
+masked = ["bob", "Carol", "dave"]
+kept = ["/.ssh/id_rsa", "AppData", "/.bashrc", "/home/"]
+
+[[case]]
+name = "cron su useradd"
+level = 3
+input = "Oct 23 03:00:01 web-prod-01 CRON[4321]: (erin) CMD (/home/erin/backup.sh)\nOct 23 03:05:00 web-prod-01 su[555]: (to root) frank on pts/1\nOct 23 03:06:00 web-prod-01 useradd[777]: new user: name=grace, UID=1003, GID=1003, home=/home/grace, shell=/bin/bash"
+masked = ["erin", "frank", "grace"]
+kept = ["CMD (", "/backup.sh", "UID=1003", "shell=/bin/bash"]
+
+[[case]]
+name = "command-line secrets"
+level = 1
+input = "bash[999]: mysql -u root -pHunter2Secret -h db.acme-corp.cn; curl --password hunter3 https://api.acme-corp.cn/v1"
+masked = ["Hunter2Secret", "hunter3"]
+kept = ["mysql -u root -p", "curl --password ", "db.acme-corp.cn"]
+
+[[case]]
+name = "command-line hosts at level 3"
+level = 3
+input = "bash[999]: mysql -u root -h db.acme-corp.cn; curl https://api.acme-corp.cn/v1"
+masked = ["db.acme-corp.cn", "api.acme-corp.cn"]
+kept = ["mysql -u root -h ", "/v1"]
+
+[[case]]
+name = "iban ssn international phone"
+level = 2
+input = "wire to GB82 WEST 1234 5698 7654 32, ssn 123-45-6789, call +1 415 555 0100"
+masked = ["GB82 WEST 1234 5698 7654 32", "123-45-6789", "+1 415 555 0100"]
+tags = ["IBAN", "SSN", "PHONE"]
+
+[[case]]
+name = "coordinates"
+level = 2
+input = "gps fix lat=39.904211 lng=116.407395 at 31.2304, 121.4737"
+masked = ["39.904211", "116.407395", "31.2304, 121.4737"]
+kept = ["gps fix lat=", " lng="]
+
+[[case]]
+name = "public infrastructure domains are kept"
+level = 3
+input = "Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]; resolving mirrors.aliyun.com"
+kept = ["deb.debian.org", "mirrors.aliyun.com"]
+
+[[case]]
+name = "placeholders are not secrets"
+level = 1
+input = "password=******** token=null secret=${VAULT_SECRET}"
+kept = ["********", "token=null", "${VAULT_SECRET}"]
+
+[[case]]
+name = "level 1 keeps identity data"
+level = 1
+input = "login from 203.0.113.5 by ops@acme-corp.cn"
+kept = ["203.0.113.5", "ops@acme-corp.cn"]
+
+[[case]]
+name = "cookies"
+level = 1
+input = "Cookie: sessionid=abcdef1234567890; csrftoken=ZXCVbnm1234567890"
+masked = ["abcdef1234567890", "ZXCVbnm1234567890"]
+kept = ["Cookie: "]
+
+[[case]]
+name = "vendor tokens"
+level = 1
+input = "export GH=ghp_1234567890abcdefghijABCDEFGHIJ0123456789; SLACK=xoxb-123456789012-abcdefghijkl"
+masked = ["ghp_1234567890abcdefghij", "xoxb-123456789012"]
+tags = ["API_KEY"]
+
+[[case]]
+name = "ip with port and trailing dot"
+level = 3
+input = "connect to 10.0.0.1:8080 failed, retrying 10.0.0.2."
+masked = ["10.0.0.1", "10.0.0.2"]
+kept = [":8080 failed", "retrying "]
+
+[[case]]
+name = "visa test card"
+level = 2
+input = "charged card 4111 1111 1111 1111 exp 12/29"
+masked = ["4111 1111 1111 1111"]
+kept = ["exp 12/29"]
+
+[[case]]
+name = "hostname kv and rhost"
+level = 3
+input = "pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=client7.acme-corp.cn  user=alice"
+masked = ["client7.acme-corp.cn", "alice"]
+kept = ["authentication failure; logname= uid=0"]
+
+[[case]]
+name = "custom deny words"
+level = 1
+deny = ["Acme Corp", "re:(?i)project[-_ ]falcon"]
+input = "Acme Corp internal build for Project-Falcon finished"
+masked = ["Acme Corp", "Project-Falcon"]
+kept = ["internal build for", "finished"]
+tags = ["REDACTED"]
+
+[[case]]
+name = "allow list"
+level = 3
+allow = ["203.0.113.0/24", "*.acme-corp.cn"]
+input = "peer 203.0.113.9 via gw.acme-corp.cn and 198.51.100.4"
+masked = ["198.51.100.4"]
+kept = ["203.0.113.9", "gw.acme-corp.cn"]

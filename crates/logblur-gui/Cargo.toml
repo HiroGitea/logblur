@@ -1,0 +1,19 @@
+[package]
+name = "logblur-gui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description.workspace = true
+
+[[bin]]
+name = "logblur-gui"
+path = "src/main.rs"
+
+[dependencies]
+logblur-core.workspace = true
+crossbeam-channel.workspace = true
+eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts", "system_fonts", "wayland", "x11"] }
+rfd = "0.17"
+sys-locale = "0.3"
+open = "5.4"

@@ -1,0 +1,476 @@
+# logblur —— 简体中文译文。占位符形如 {name}；键与 en.toml 保持一致。
+
+[meta]
+tag = "zh-CN"
+name = "简体中文"
+
+[error]
+io = "{context}：{source}"
+zip = "zip 错误（{context}）：{source}"
+config = "配置错误：{msg}"
+rule = "规则 {rule} 编译失败：{msg}"
+output_exists = "输出已存在：{path}（使用 --force 覆盖）"
+unsupported = "不支持：{msg}"
+cancelled = "已取消"
+
+[io]
+access = "无法访问 {path}"
+open = "无法打开 {path}"
+read = "读取 {path}"
+create = "无法创建 {path}"
+write = "写入 {path}"
+rename = "无法改名为 {path}"
+mkdir = "无法创建目录 {path}"
+read_dir = "无法读取目录 {path}"
+read_entry = "读取第 {index} 个条目"
+read_link = "读取链接 {path}"
+read_tar = "读取 tar 包"
+read_tar_entry = "读取 tar 条目"
+decompress = "解压 {path}"
+compress = "压缩 {path}"
+write_link = "写入链接 {path}"
+temp_create = "在 {path} 创建临时文件"
+temp_io = "读写临时文件"
+write_output = "写入输出"
+write_stdout = "写入标准输出"
+read_config = "读取配置文件 {path}"
+write_report = "无法写入报告 {path}"
+
+[config]
+level_range = "保密等级需在 1–4 之间，当前为 {level}"
+fixed_width = "fixed_width 需在 1–64 之间"
+hash_len = "hash_len 需在 4–64 之间"
+mask_newline = "打码字符不能是换行符"
+fallback_ascii = "fallback_char 必须是 ASCII 字符"
+chunk_small = "chunk_size 过小"
+bad_percent = "无效的内存百分比：{value}"
+percent_range = "内存百分比需在 1–100 之间：{value}"
+bad_size = "无效的内存大小：{value}（示例：2G、512M、70%）"
+bad_allow_regex = "允许名单正则无效 {re}：{err}"
+bad_cidr = "无效的网段：{value}"
+custom_no_group = "自定义规则 {id} 没有第 {group} 个捕获组"
+bad_deny = "拒绝名单无效：{err}"
+too_many_rules = "规则太多"
+learned_build = "构建已学习标识失败：{err}"
+same_io = "输出不能与输入相同：{path}"
+stdout_multi = "含多个文件的压缩包或目录不能输出到标准输出"
+template = '''
+# logblur 配置文件（TOML）。所有字段都可省略；命令行参数优先于这里的设置。
+
+# 保密等级：1=凭据  2=+身份信息  3=+网络与设备标识（默认）  4=偏执
+level = 3
+
+# 打码方式：block（默认，逐字符 ░）| fixed | star | tag | pseudo | partial | remove | hash
+mask = "block"
+mask_char = "░"
+# 输出编码无法表示 mask_char 时（如 windows-1252）改用的字符
+fallback_char = "*"
+fixed_width = 6
+hash_len = 12
+
+# pseudo / hash 模式的盐。固定它可以让多次运行、多个压缩包得到相同的代号。
+# salt = "change-me"
+# pseudo 模式使用 IP_1、IP_2 这样的递增编号（单线程，保证编号确定）
+counter = false
+
+# 类别微调（id 见 `logblur rules list`）
+# only = ["password", "api_key", "ipv4"]   # 只处理这些
+enable = []                                # 在当前等级之外额外启用，如 ["timestamp", "hardware_id"]
+skip = []                                  # 关闭，如 ["uuid"]
+mask_dates = false
+
+keep_private_ips = false   # 保留 10.x / 172.16-31.x / 192.168.x / fc00::/7
+learn = true               # 两遍扫描：先学到用户名/主机名，再在全文中清洗
+scrub_names = true         # 同时清洗压缩包内的文件名
+
+# 允许名单：精确值（大小写不敏感）、*.后缀、前缀*、CIDR、re:正则
+allow = [
+  # "203.0.113.0/24",
+  # "*.mirror.example.org",
+  # "build-server-01",
+]
+
+# 拒绝名单：总要打码的词（大小写不敏感），或 re:正则
+deny = [
+  # "Acme Corp",
+  # "re:(?i)project[-_ ]falcon",
+]
+
+# 自定义规则：pattern 为 Rust regex 语法；group 指定打码的捕获组
+# [[custom_rules]]
+# id = "order-id"
+# pattern = 'ORD-[0-9]{10}'
+# category = "custom"
+# level = 1
+#
+# [[custom_rules]]
+# id = "employee-id"
+# pattern = '(?i)emp(?:loyee)?[_ -]?id[=: ]+([A-Z0-9]{6,})'
+# group = 1
+
+# threads = 8              # 默认使用全部逻辑核
+memory = "auto"            # auto | 2G | 512M | 70%
+binary = "copy"            # copy | drop  二进制条目原样复制或丢弃
+output_encoding = "preserve"   # preserve | utf8
+'''
+
+[rules]
+custom = "自定义规则 {id}"
+deny_regex = "拒绝名单正则 {re}"
+custom_info = "自定义：{pattern}"
+
+[mask]
+block = "逐字符遮盖（░，长度不变）"
+fixed = "固定宽度遮盖（隐藏长度）"
+star = "星号 *"
+tag = "类别标签 [IPV4]"
+pseudo = "一致伪名 IP_k3f9xq2a"
+partial = "部分保留（末 4 位 / 域名）"
+remove = "直接删除"
+hash = "加盐哈希"
+
+[level]
+1 = "凭据"
+2 = "身份"
+3 = "网络与设备"
+4 = "偏执"
+1_desc = "口令、密钥、令牌、私钥、连接串、Cookie"
+2_desc = "+ 邮箱、电话、证件号、银行卡、车牌、SSH 公钥、经纬度"
+3_desc = "+ IP / MAC 地址、主机名、用户名、UUID、序列号、Wi-Fi 名称（默认）"
+4_desc = "+ 硬件标识、User-Agent、整条 URL、长数字 / 十六进制 / base64 串"
+
+[category]
+password = "口令"
+api_key = "API 密钥"
+token = "令牌 / Cookie"
+private_key = "私钥"
+email = "电子邮箱"
+phone = "电话号码"
+id_card = "身份证号"
+ssn = "美国 SSN"
+bank_card = "银行卡号"
+iban = "IBAN"
+license_plate = "车牌号"
+ssh_key = "SSH 公钥 / 指纹"
+geo_coord = "经纬度"
+imei = "IMEI / IMSI"
+ipv4 = "IPv4 地址"
+ipv6 = "IPv6 地址"
+mac = "MAC 地址"
+hostname = "主机名 / 域名"
+username = "用户名"
+uuid = "UUID"
+machine_id = "机器 ID"
+serial = "设备序列号"
+wifi_ssid = "Wi-Fi 名称"
+url = "整条 URL"
+user_agent = "User-Agent"
+hardware_id = "硬件标识（PCI/USB/DMI）"
+long_number = "长数字串"
+hex_string = "长十六进制串"
+base64 = "长 base64 串"
+timestamp = "时间戳"
+custom = "自定义"
+
+[status]
+scrubbed = "已清洗"
+binary = "二进制（原样复制）"
+encrypted = "加密（原样复制）"
+dropped = "已删除"
+skipped = "已跳过"
+dir = "目录"
+link = "链接"
+
+[binary]
+nul = "二进制（含 NUL 字节）"
+control = "二进制（控制字符过多）"
+magic = "二进制（{what}）"
+journal = "systemd journal 二进制文件（含主机名、用户名等，未清洗；请先用 journalctl -o short-iso 或 -o export 导出为文本）"
+login_records = "wtmp/btmp/lastlog 登录记录（含用户名和来源 IP，未清洗；请先用 last -f 导出为文本）"
+
+[binary.kind]
+nested_archive = "嵌套压缩包，未清洗"
+elf = "ELF 可执行文件"
+image = "图片"
+pdf = "PDF"
+sqlite = "SQLite 数据库"
+pcap = "抓包文件"
+executable = "可执行文件"
+
+[pipeline]
+special_file = "特殊文件"
+skip_special = "跳过特殊文件（{desc}）"
+warn_skip_special = "{name}：跳过特殊文件（{desc}）"
+encrypted = "加密条目：无法读取，未清洗"
+warn_encrypted = "{name}：加密条目无法读取，未清洗"
+warn_binary = "{name}：{desc}"
+gz_note = "gzip 内的文本已清洗并重新压缩"
+decode_replaced = "部分字节无法按检测到的编码解码，已替换为 U+FFFD"
+decode_failed = "无法按 {encoding} 完整解码，已按原始字节清洗"
+writer_gone = "内部错误：写线程已退出"
+workers_gone = "内部错误：工作线程已退出"
+stream_no_begin = "内部错误：流式块没有开头"
+stream_unfinished = "内部错误：流式条目没有正常结束"
+stream_not_started = "内部错误：流式写入未开始"
+no_zip_blob = "内部错误：输出端不支持预压缩条目（{name}）"
+no_raw_copy = "内部错误：输出端不支持原样复制（{name}）"
+one_file_only = "单文件输出只能容纳一个文件，但输入还有 {name}；请输出为 .zip / .tar.gz 或目录"
+missing_output = "内部错误：缺少输出路径"
+missing_input = "缺少输入路径"
+missing_src_zip = "内部错误：缺少源 zip"
+
+[report]
+title = "# logblur 清洗报告"
+input = "输入：`{path}`（{kind}）"
+output = "输出：`{path}`（{kind}，{size}）"
+level_mask = "保密等级：{level}，打码方式：{mask}"
+salt = "盐指纹：{fp}"
+entries = "条目：{total} 个（文本 {text}，二进制 {binary}，跳过 {skipped}）"
+volume = "处理量：{bytes_in} → {bytes_out}，用时 {secs} 秒，{threads} 线程，内存预算 {budget}"
+matches = "打码总数：{n}"
+by_category = "按类别"
+col_category = "类别"
+col_count = "数量"
+learned = "学习到的标识（只列数量）"
+warnings = "警告"
+entries_heading = "条目"
+col_name = "名称"
+col_status = "状态"
+col_encoding = "编码"
+col_matches = "打码数"
+col_note = "说明"
+
+[rule]
+pem_private_key = "PEM / OpenSSH / PGP 私钥块（多行，保留首尾标记行）"
+vendor_api_key = "云服务与平台密钥：AWS、GitHub、GitLab、Slack、Google、Stripe、OpenAI、Anthropic、npm、PyPI、Docker Hub、Hugging Face、SendGrid、Telegram、阿里云、腾讯云等"
+jwt = "JSON Web Token（eyJ….eyJ….签名）"
+authorization_header = "HTTP Authorization / Proxy-Authorization 头"
+bearer_token = "Bearer 令牌"
+cookie_header = "Cookie / Set-Cookie 头的值"
+session_cookie = "会话 Cookie / CSRF 令牌：JSESSIONID=…、PHPSESSID=…、csrftoken=…"
+kv_secret = "键值对里的口令/密钥：password=…、\"api_key\": \"…\"、secret: …、psk=…、密码：…"
+xml_secret = "XML 元素里的口令：<password>…</password>"
+cli_secret = "命令行参数里的口令：--password xxx、--token=xxx"
+mysql_p = "mysql 客户端的 -p口令"
+uri_password = "URI 里的口令：scheme://user:password@host"
+url_query_secret = "URL 查询参数里的令牌/签名：?token=…&sig=…"
+azure_conn = "Azure / ADO 连接串的 AccountKey、SharedAccessKey"
+email = "电子邮箱（排除 user@1000.service 这类 systemd 单元名）"
+phone_cn = "中国大陆手机号（可带 +86、空格或连字符）"
+phone_intl = "国际格式电话：+1 415 555 0100、+44 20 7946 0958"
+phone_kw = "关键词后的电话：tel: …、mobile=…、手机：…"
+cn_id_card = "中国居民身份证号（18 位，校验位验证）"
+us_ssn = "美国社会安全号 123-45-6789"
+bank_card = "银行卡号（13–19 位，Luhn 校验）"
+account_kw = "关键词后的卡号/账号：card no: …、卡号：…（不要求 Luhn）"
+iban = "国际银行账号 IBAN（mod-97 校验）"
+cn_plate = "中国车牌号"
+ssh_pubkey = "SSH 公钥（只打码 base64 部分）"
+ssh_fingerprint = "SSH 密钥指纹 SHA256:… / MD5:…（sshd 登录日志里常见）"
+geo_pair = "经纬度坐标对 39.9042, 116.4074"
+geo_kw = "关键词后的经度/纬度：lat=…、lng: …、纬度：…"
+imei_kw = "关键词后的 IMEI / IMSI / MEID / ICCID"
+ipv4 = "IPv4 地址（排除回环、广播、组播、公共 DNS 与版本号）"
+ipv6 = "IPv6 地址（含链路本地 fe80::，排除 ::1 与组播）"
+mac = "MAC 地址 aa:bb:cc:dd:ee:ff / aa-bb-… / aabb.ccdd.eeff"
+iptables_mac = "iptables / nftables 日志的 MAC= 字段（目标 MAC + 源 MAC + 类型）"
+syslog_host = "syslog / journalctl 行首的主机名（RFC 3164 与 ISO 时间格式）"
+syslog5424_host = "RFC 5424 syslog 的主机名字段"
+hostname_kv = "键值对里的主机名：hostname=…、_HOSTNAME=…、rhost=…、\"host\": \"…\""
+hostname_change = "systemd / hostnamed：Set hostname to <…>、Changed host name to '…'"
+kernel_banner = "内核启动横幅里的 user@buildhost"
+url_host = "URL 里的主机名（排除公共基础设施域名）"
+hostname_fqdn = "完全限定域名（常见顶级域与 .local/.lan/.internal；排除公共基础设施域名和文件名）"
+ip_dashed_host = "内嵌 IP 的云主机名 ip-10-0-0-1"
+ssh_login_user = "sshd 成功登录的用户：Accepted publickey for alice from …"
+session_user = "PAM 会话：session opened for user alice"
+by_uid_user = "PAM / su：by alice(uid=1000)"
+sudo_user = "sudo 日志的调用者：sudo:    alice : TTY=…"
+logind_user = "systemd-logind：New session 3 of user alice"
+login_on_user = "login：LOGIN ON tty1 BY alice"
+failed_login_user = "login：FAILED LOGIN (1) on '/dev/tty1' FOR 'alice'"
+cron_user = "cron：CRON[123]: (alice) CMD …"
+account_change = "账户变更：new user: name=alice、password changed for alice"
+su_user = "su：(to root) alice on pts/0"
+audit_acct = "auditd：acct=\"alice\""
+ssh_attempt_user = "sshd 失败 / 无效用户（可能是误输入的口令，所以不学习）"
+user_kv = "键值对里的用户名：user=…、USER=…、\"username\": \"…\"、用户名：…"
+uri_user = "URI 里的用户名：scheme://user:pass@host"
+home_path = "家目录里的用户名：/home/alice、/Users/alice、C:\\Users\\alice、~alice/"
+uuid = "UUID / GUID（磁盘、分区、启动 ID 等）"
+machine_id = "machine-id / boot-id / 设备 ID：_MACHINE_ID=…、machine-id: …、android_id=…"
+journal_dir_id = "journald 目录里的 machine-id：/var/log/journal/<32 位十六进制>/"
+serial = "设备序列号：SerialNumber: …、ID_SERIAL=…、Serial Number: …"
+wifi_ssid = "Wi-Fi 名称：SSID 'Home'、access point 'Home'、connection 'Home'、network \"Home\""
+wifi_ssid_kv = "ssid=Home（无引号）"
+url_full = "整条 URL（浏览记录、下载地址等）"
+hostname_any = "任意顶级域的主机名（偏执；排除文件名）"
+user_agent = "User-Agent 字符串"
+pci_address = "PCI 总线地址 0000:00:1f.6（不指向个人，仅偏执模式）"
+usb_pci_ids = "USB / PCI 厂商与产品 ID：idVendor=046d、[8086:9a49]"
+dmi_info = "DMI / 主板 / 型号：DMI: …、Hardware name: …、Product Name: …"
+long_number = "9 位以上的长数字（排除时间戳）"
+hex_string = "16 位以上的十六进制串（哈希、ID、git commit 等）"
+base64_blob = "高熵 base64 / 随机串（24 字符以上）"
+ts_iso = "ISO 8601 时间"
+ts_syslog = "syslog 时间 Oct 23 11:12:13"
+ts_date = "日期 2026-10-23 / 2026/10/23"
+ts_epoch = "Unix 时间戳"
+
+[cli]
+about = "清洗 Linux 日志压缩包里的敏感信息（口令、密钥、IP/MAC 地址、邮箱、用户名、主机名……），全程在内存中处理。"
+after_help = """
+示例：
+  logblur logs.zip                         # 在旁边生成 logs.blurred.zip
+  logblur -l 4 -m pseudo --salt s3 logs.tar.gz
+  journalctl -b | logblur - > boot.txt
+  logblur preview logs.zip -n 30 --show-original
+  logblur rules list --all
+  logblur rules test "Accepted publickey for alice from 203.0.113.5"
+
+界面语言：--lang、LOGBLUR_LANG、LANGUAGE、LC_ALL、LC_MESSAGES 或 LANG（见 `logblur languages`）。
+退出码：0 成功，1 用法或配置错误，2 处理失败，3 已取消。"""
+
+[cli.arg]
+input = "输入：.zip、.tar、.tar.gz/.tgz、.gz、文本文件、文件夹，或用 - 表示标准输入"
+output = "输出路径（仅限单个输入）。扩展名决定格式：.zip、.tar、.tar.gz/.tgz；其他名字输出为文件夹（单文件输入则为普通文件）；- 表示标准输出"
+out_dir = "输出目录（默认放在每个输入旁边）"
+config = "从 TOML 文件读取设置（见 `logblur config init`）"
+level = "保密等级：1 凭据，2 +身份，3 +网络与设备（默认），4 偏执"
+mask = "打码方式：block（默认）、fixed、star、tag、pseudo、partial、remove、hash"
+mask_char = "block / fixed / partial 模式的打码字符（默认 ░）"
+fixed_width = "fixed 模式的宽度"
+salt = "pseudo / hash 模式的盐；多次运行使用同一个盐可得到相同的代号"
+counter = "伪名使用递增编号（IP_1、IP_2…）；为保证编号确定会单线程运行"
+only = "只处理这些类别（逗号分隔；见 `logblur rules list`）"
+enable = "在当前等级之外额外启用这些类别，如 timestamp,hardware_id"
+skip = "关闭这些类别"
+keep_private_ips = "保留内网地址（10/8、172.16/12、192.168/16、100.64/10、fc00::/7）"
+mask_dates = "同时打码日期和时间戳"
+no_learn = "跳过第一遍学习（先学到用户名、主机名，再在全文中清洗）"
+keep_names = "不清洗压缩包内的文件名"
+allow = "永不打码的值：精确文本、*.域名、前缀*、CIDR、re:正则，或 @文件（每行一项）；可重复"
+deny = "总要打码的词（大小写不敏感）、re:正则，或 @文件；可重复"
+binary = "二进制条目的处理方式"
+output_encoding = "清洗后文本的编码"
+report = "同时在输出旁写一份报告"
+report_path = "报告的写入位置"
+force = "覆盖已存在的输出"
+dry_run = "只扫描统计，不写任何文件"
+quiet = "不显示进度条和摘要"
+threads = "工作线程数（默认使用全部逻辑核）"
+memory = "内存预算：auto（可用内存的 70%）、2G、512M 或 70%"
+lang = "界面语言，如 en 或 zh-CN"
+lines = "显示的行数"
+show_original = "同时显示被改动的原始行（只出现在你的终端上）"
+text = "要测试的文本；- 表示从标准输入读取"
+all = "同时列出未启用的规则"
+template_out = "把模板写到这个文件而不是标准输出"
+size = "合成日志的数据量，如 200M"
+
+[cli.cmd]
+scrub = "清洗压缩包、文件或文件夹（默认命令）"
+preview = "预览每个文本文件清洗后的前几行"
+rules = "列出或试用识别规则"
+rules_list = "列出规则和类别及其是否启用"
+rules_test = "清洗一段文本并显示命中了什么"
+config = "配置文件工具"
+config_init = "输出或写入带注释的配置模板"
+languages = "列出可用的界面语言"
+bench = "用合成日志测量扫描吞吐量"
+
+[cli.col]
+level = "等级"
+active = "启用"
+category = "类别"
+rule = "规则"
+description = "说明"
+
+[cli.msg]
+no_input = "没有指定输入；试试 `logblur --help`"
+output_needs_single = "--output 只能用于单个输入；多个输入请用 --out-dir"
+bad_mask = "未知的打码方式：{value}"
+bad_category = "未知的类别：{value}（见 `logblur rules list`）"
+read_list = "无法读取 {path}：{err}"
+done = "✔ {input} → {output}"
+summary = "  {entries} 个条目（文本 {text}，二进制 {binary}，跳过 {skipped}），打码 {matches} 处，用时 {secs} 秒"
+top_categories = "  打码：{list}"
+learned = "  学习到的标识：{n} 个"
+warning = "  ⚠ {msg}"
+more_warnings = "  …… 另有 {n} 条警告（见报告）"
+report_written = "  报告：{path}"
+failed = "✘ {input}：{err}"
+cancelled = "已取消；未完成的输出已删除"
+ctrlc = "正在停止……再按一次 Ctrl+C 立即退出"
+phase_learn = "学习中"
+phase_scrub = "清洗中"
+dry_run = "  （演练模式——没有写入任何文件）"
+preview_header = "==> {name} <=="
+preview_binary = "（二进制，已跳过）"
+preview_note = "（打码方式改变了行数；只显示清洗后的文本）"
+rules_footer = "第 {level} 级共启用 {active} / {total} 条规则。"
+categories_header = "类别（● 表示在此等级启用；依次为 id、默认等级、名称）："
+test_found = "命中："
+test_none = "没有命中"
+config_written = "已写入 {path}"
+languages_current = "（当前）"
+bench_result = "{size} 用时 {secs} 秒 → {rate}/秒，{threads} 线程，打码 {matches} 处"
+yes = "是"
+no = "否"
+
+[gui]
+title = "logblur —— 日志脱敏"
+subtitle = "在内存中清洗日志压缩包里的敏感信息"
+language = "语言"
+settings = "设置"
+level = "保密等级"
+level_extra = "仅在手动启用时"
+mask = "打码方式"
+mask_char = "打码字符"
+salt = "盐"
+salt_hint = "留空 = 每次运行随机"
+counter = "递增编号伪名（IP_1、IP_2…）"
+categories = "类别"
+reset_categories = "恢复为等级默认"
+options = "选项"
+keep_private_ips = "保留内网 IP 地址"
+learn = "先学习用户名和主机名（两遍扫描）"
+scrub_names = "清洗压缩包内的文件名"
+binary_drop = "删除二进制条目（而不是原样复制）"
+utf8_out = "所有文本输出为 UTF-8"
+report = "生成报告"
+allow = "允许名单（每行一项）"
+deny = "拒绝名单（每行一项）"
+out_dir = "输出目录"
+out_dir_same = "放在每个输入旁边"
+choose = "选择…"
+reset = "重置"
+advanced = "高级"
+threads = "线程数"
+auto = "自动"
+memory = "内存预算"
+memory_hint = "auto、2G、512M 或 70%"
+privacy_note = "一切在本机进行。未清洗的明文只在内存中，永远不会写入磁盘。"
+drop_title = "把 .zip / .tar.gz / .gz / 日志文件或文件夹拖到这里"
+drop_hint = "或点击选择文件"
+drop_release = "松开即可加入"
+pick_files = "选择文件…"
+pick_folder = "选择文件夹…"
+queue = "排队中 {n} 个"
+wayland_hint = "Wayland 下暂时可能无法拖入文件：请使用按钮，或用空的 WAYLAND_DISPLAY 启动（WAYLAND_DISPLAY= logblur-gui）以通过 XWayland 运行。"
+config_error = "设置无效：{err}"
+phase_learn = "第 1/2 遍——学习用户名和主机名"
+phase_scrub = "清洗中"
+cancel = "取消"
+speed = "已读取 {done} · {rate}/秒"
+results = "结果"
+clear_results = "清空"
+no_results = "还没有处理任何文件。"
+entries_line = "{entries} 个条目 · 文本 {text} · 二进制 {binary} · 跳过 {skipped} · {secs} 秒"
+masked_total = "打码 {n} 处"
+learned = "学习到的标识：{n} 个"
+warnings = "警告（{n}）"
+open_folder = "打开所在文件夹"
+open_report = "打开报告"
+failed = "✘ {input}：{err}"
+cancelled = "{input}：已取消，未完成的输出已删除"

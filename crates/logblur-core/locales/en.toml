@@ -1,0 +1,400 @@
+# logblur — English messages (source language and fallback).
+# Placeholders look like {name}. Keys are "table.key"; keep them in sync with zh-CN.toml.
+
+[meta]
+tag = "en"
+name = "English"
+
+[error]
+io = "{context}: {source}"
+zip = "zip error ({context}): {source}"
+config = "configuration error: {msg}"
+rule = "failed to compile rule {rule}: {msg}"
+output_exists = "output already exists: {path} (use --force to overwrite)"
+unsupported = "unsupported: {msg}"
+cancelled = "cancelled"
+
+[io]
+access = "cannot access {path}"
+open = "cannot open {path}"
+read = "reading {path}"
+create = "cannot create {path}"
+write = "writing {path}"
+rename = "cannot rename to {path}"
+mkdir = "cannot create directory {path}"
+read_dir = "cannot read directory {path}"
+read_entry = "reading entry #{index}"
+read_link = "reading link {path}"
+read_tar = "reading tar archive"
+read_tar_entry = "reading tar entry"
+decompress = "decompressing {path}"
+compress = "compressing {path}"
+write_link = "writing link {path}"
+temp_create = "creating a temporary file in {path}"
+temp_io = "temporary file I/O"
+write_output = "writing output"
+write_stdout = "writing to standard output"
+read_config = "reading config file {path}"
+write_report = "cannot write report {path}"
+
+[config]
+level_range = "security level must be between 1 and 4, got {level}"
+fixed_width = "fixed_width must be between 1 and 64"
+hash_len = "hash_len must be between 4 and 64"
+mask_newline = "the mask character cannot be a newline"
+fallback_ascii = "fallback_char must be an ASCII character"
+chunk_small = "chunk_size is too small"
+bad_percent = "invalid memory percentage: {value}"
+percent_range = "memory percentage must be between 1 and 100: {value}"
+bad_size = "invalid memory size: {value} (examples: 2G, 512M, 70%)"
+bad_allow_regex = "invalid allow-list regex {re}: {err}"
+bad_cidr = "invalid network: {value}"
+custom_no_group = "custom rule {id} has no capture group {group}"
+bad_deny = "invalid deny list: {err}"
+too_many_rules = "too many rules"
+learned_build = "failed to build the learned identifiers: {err}"
+same_io = "the output must differ from the input: {path}"
+stdout_multi = "archives and directories with several files cannot be written to standard output"
+template = '''
+# logblur configuration (TOML). Every field is optional; command-line options win over this file.
+
+# Security level: 1 = credentials, 2 = + identity, 3 = + network & device identifiers (default), 4 = paranoid
+level = 3
+
+# Mask mode: block (default, one ░ per character) | fixed | star | tag | pseudo | partial | remove | hash
+mask = "block"
+mask_char = "░"
+# Used when the output encoding cannot represent mask_char (e.g. windows-1252)
+fallback_char = "*"
+fixed_width = 6
+hash_len = 12
+
+# Salt for the pseudo / hash modes. Keep it fixed to get the same pseudonyms across runs and archives.
+# salt = "change-me"
+# Pseudonyms as counters IP_1, IP_2… (single-threaded so the numbering is deterministic)
+counter = false
+
+# Category tweaks (ids: `logblur rules list`)
+# only = ["password", "api_key", "ipv4"]   # handle only these
+enable = []                                # enable on top of the level, e.g. ["timestamp", "hardware_id"]
+skip = []                                  # disable, e.g. ["uuid"]
+mask_dates = false
+
+keep_private_ips = false   # keep 10.x / 172.16-31.x / 192.168.x / fc00::/7
+learn = true               # two passes: learn user and host names first, then scrub them everywhere
+scrub_names = true         # also scrub file names inside archives
+
+# Allow list: exact values (case-insensitive), *.suffix, prefix*, CIDR, re:REGEX
+allow = [
+  # "203.0.113.0/24",
+  # "*.mirror.example.org",
+  # "build-server-01",
+]
+
+# Deny list: words that are always masked (case-insensitive), or re:REGEX
+deny = [
+  # "Acme Corp",
+  # "re:(?i)project[-_ ]falcon",
+]
+
+# Custom rules: pattern uses Rust regex syntax; group selects the capture group to mask
+# [[custom_rules]]
+# id = "order-id"
+# pattern = 'ORD-[0-9]{10}'
+# category = "custom"
+# level = 1
+#
+# [[custom_rules]]
+# id = "employee-id"
+# pattern = '(?i)emp(?:loyee)?[_ -]?id[=: ]+([A-Z0-9]{6,})'
+# group = 1
+
+# threads = 8              # default: all logical cores
+memory = "auto"            # auto | 2G | 512M | 70%
+binary = "copy"            # copy | drop  binary entries are copied unchanged or dropped
+output_encoding = "preserve"   # preserve | utf8
+'''
+
+[rules]
+custom = "custom rule {id}"
+deny_regex = "deny-list regex {re}"
+custom_info = "custom: {pattern}"
+
+[mask]
+block = "Block characters (░, length kept)"
+fixed = "Fixed width (hides the length)"
+star = "Asterisks *"
+tag = "Category tag [IPV4]"
+pseudo = "Consistent pseudonym IP_k3f9xq2a"
+partial = "Partial (last 4 digits / domain kept)"
+remove = "Remove"
+hash = "Salted hash"
+
+[level]
+1 = "Credentials"
+2 = "Identity"
+3 = "Network & devices"
+4 = "Paranoid"
+1_desc = "Passwords, keys, tokens, private keys, connection strings, cookies"
+2_desc = "+ e-mail, phone, ID and card numbers, licence plates, SSH keys, coordinates"
+3_desc = "+ IP / MAC addresses, host and user names, UUIDs, serial numbers, Wi-Fi names (default)"
+4_desc = "+ hardware IDs, User-Agents, whole URLs, long numbers / hex / base64"
+
+[category]
+password = "Passwords"
+api_key = "API keys"
+token = "Tokens / cookies"
+private_key = "Private keys"
+email = "E-mail addresses"
+phone = "Phone numbers"
+id_card = "Chinese ID numbers"
+ssn = "US SSNs"
+bank_card = "Card numbers"
+iban = "IBANs"
+license_plate = "Licence plates"
+ssh_key = "SSH keys / fingerprints"
+geo_coord = "Coordinates"
+imei = "IMEI / IMSI"
+ipv4 = "IPv4 addresses"
+ipv6 = "IPv6 addresses"
+mac = "MAC addresses"
+hostname = "Host / domain names"
+username = "User names"
+uuid = "UUIDs"
+machine_id = "Machine IDs"
+serial = "Serial numbers"
+wifi_ssid = "Wi-Fi names"
+url = "Whole URLs"
+user_agent = "User-Agents"
+hardware_id = "Hardware IDs (PCI/USB/DMI)"
+long_number = "Long numbers"
+hex_string = "Long hex strings"
+base64 = "Long base64 strings"
+timestamp = "Timestamps"
+custom = "Custom"
+
+[status]
+scrubbed = "scrubbed"
+binary = "binary (copied)"
+encrypted = "encrypted (copied)"
+dropped = "dropped"
+skipped = "skipped"
+dir = "directory"
+link = "link"
+
+[binary]
+nul = "binary (contains NUL bytes)"
+control = "binary (too many control characters)"
+magic = "binary ({what})"
+journal = "systemd journal binary file (contains host and user names; NOT scrubbed — export it as text first with `journalctl -o short-iso` or `-o export`)"
+login_records = "wtmp/btmp/lastlog login records (contain user names and source IPs; NOT scrubbed — export them as text first with `last -f`)"
+
+[binary.kind]
+nested_archive = "nested archive, NOT scrubbed"
+elf = "ELF executable"
+image = "image"
+pdf = "PDF"
+sqlite = "SQLite database"
+pcap = "packet capture"
+executable = "executable"
+
+[pipeline]
+special_file = "special file"
+skip_special = "skipped special file ({desc})"
+warn_skip_special = "{name}: skipped special file ({desc})"
+encrypted = "encrypted entry: cannot be read, NOT scrubbed"
+warn_encrypted = "{name}: encrypted entry cannot be read and was NOT scrubbed"
+warn_binary = "{name}: {desc}"
+gz_note = "text inside the gzip was scrubbed and recompressed"
+decode_replaced = "some bytes could not be decoded with the detected encoding and were replaced with U+FFFD"
+decode_failed = "could not fully decode as {encoding}; the raw bytes were scrubbed"
+writer_gone = "internal error: the writer thread exited"
+workers_gone = "internal error: the worker threads exited"
+stream_no_begin = "internal error: streamed chunk without a start"
+stream_unfinished = "internal error: a streamed entry did not finish"
+stream_not_started = "internal error: streaming write not started"
+no_zip_blob = "internal error: the output cannot take a pre-compressed entry ({name})"
+no_raw_copy = "internal error: the output cannot copy raw entries ({name})"
+one_file_only = "a single-file output can hold only one file, but the input also contains {name}; write a .zip / .tar.gz or a directory instead"
+missing_output = "internal error: missing output path"
+missing_input = "missing input path"
+missing_src_zip = "internal error: missing source zip"
+
+[report]
+title = "# logblur scrub report"
+input = "Input: `{path}` ({kind})"
+output = "Output: `{path}` ({kind}, {size})"
+level_mask = "Security level: {level}, mask mode: {mask}"
+salt = "Salt fingerprint: {fp}"
+entries = "Entries: {total} (text {text}, binary {binary}, skipped {skipped})"
+volume = "Processed {bytes_in} → {bytes_out} in {secs} s with {threads} threads, memory budget {budget}"
+matches = "Items masked: {n}"
+by_category = "By category"
+col_category = "Category"
+col_count = "Count"
+learned = "Learned identifiers (counts only)"
+warnings = "Warnings"
+entries_heading = "Entries"
+col_name = "Name"
+col_status = "Status"
+col_encoding = "Encoding"
+col_matches = "Masked"
+col_note = "Note"
+
+[cli]
+about = "Scrub sensitive data (passwords, keys, IP/MAC addresses, e-mails, user and host names…) from Linux log archives — entirely in memory."
+after_help = """
+Examples:
+  logblur logs.zip                         # writes logs.blurred.zip next to it
+  logblur -l 4 -m pseudo --salt s3 logs.tar.gz
+  journalctl -b | logblur - > boot.txt
+  logblur preview logs.zip -n 30 --show-original
+  logblur rules list --all
+  logblur rules test "Accepted publickey for alice from 203.0.113.5"
+
+Language: --lang, LOGBLUR_LANG, LANGUAGE, LC_ALL, LC_MESSAGES or LANG (see `logblur languages`).
+Exit codes: 0 success, 1 usage or configuration error, 2 processing failed, 3 cancelled."""
+
+[cli.arg]
+input = "Input: .zip, .tar, .tar.gz/.tgz, .gz, a text file, a directory, or - for standard input"
+output = "Output path (single input only). The extension picks the format: .zip, .tar, .tar.gz/.tgz; anything else is a directory (or a plain file for single-file inputs); - writes to standard output"
+out_dir = "Directory for the outputs (default: next to each input)"
+config = "Read settings from a TOML file (see `logblur config init`)"
+level = "Security level: 1 credentials, 2 + identity, 3 + network & devices (default), 4 paranoid"
+mask = "Mask mode: block (default), fixed, star, tag, pseudo, partial, remove, hash"
+mask_char = "Mask character for the block / fixed / partial modes (default ░)"
+fixed_width = "Width of the fixed mask mode"
+salt = "Salt for the pseudo / hash modes; reuse it to get identical pseudonyms across runs"
+counter = "Pseudonyms as counters (IP_1, IP_2…); runs single-threaded to stay deterministic"
+only = "Handle only these categories (comma separated; see `logblur rules list`)"
+enable = "Also enable these categories beyond the level, e.g. timestamp,hardware_id"
+skip = "Disable these categories"
+keep_private_ips = "Keep private addresses (10/8, 172.16/12, 192.168/16, 100.64/10, fc00::/7)"
+mask_dates = "Also mask dates and timestamps"
+no_learn = "Skip the first pass that learns user and host names to scrub them everywhere"
+keep_names = "Do not scrub file names inside archives"
+allow = "Never mask this value: exact text, *.domain, prefix*, CIDR, re:REGEX, or @FILE with one entry per line (repeatable)"
+deny = "Always mask this word (case-insensitive), re:REGEX, or @FILE (repeatable)"
+binary = "What to do with binary entries"
+output_encoding = "Encoding of the scrubbed text"
+report = "Also write a report next to the output"
+report_path = "Where to write the report"
+force = "Overwrite existing outputs"
+dry_run = "Scan and count only; write nothing"
+quiet = "No progress bar or summary"
+threads = "Worker threads (default: all logical cores)"
+memory = "Memory budget: auto (70% of available), 2G, 512M or 70%"
+lang = "Interface language, e.g. en or zh-CN"
+lines = "Number of lines to show"
+show_original = "Also print the original lines that changed (only on your terminal)"
+text = "Text to test; - reads standard input"
+all = "Also list inactive rules"
+template_out = "Write the template to this file instead of standard output"
+size = "Amount of synthetic log data, e.g. 200M"
+
+[cli.cmd]
+scrub = "Scrub archives, files or directories (the default command)"
+preview = "Show the first lines of each text file after scrubbing"
+rules = "List or try the detection rules"
+rules_list = "List the rules and categories and whether they are active"
+rules_test = "Scrub a piece of text and show what matched"
+config = "Configuration file helpers"
+config_init = "Print or write a commented configuration template"
+languages = "List the available interface languages"
+bench = "Measure scanning throughput on synthetic logs"
+
+[cli.col]
+level = "LEVEL"
+active = "ACTIVE"
+category = "CATEGORY"
+rule = "RULE"
+description = "DESCRIPTION"
+
+[cli.msg]
+no_input = "no input given; try `logblur --help`"
+output_needs_single = "--output works with a single input only; use --out-dir for several"
+bad_mask = "unknown mask mode: {value}"
+bad_category = "unknown category: {value} (see `logblur rules list`)"
+read_list = "cannot read {path}: {err}"
+done = "✔ {input} → {output}"
+summary = "  {entries} entries ({text} text, {binary} binary, {skipped} skipped), {matches} items masked in {secs} s"
+top_categories = "  masked: {list}"
+learned = "  learned identifiers: {n}"
+warning = "  ⚠ {msg}"
+more_warnings = "  … and {n} more warnings (see the report)"
+report_written = "  report: {path}"
+failed = "✘ {input}: {err}"
+cancelled = "cancelled; the unfinished output was removed"
+ctrlc = "stopping… press Ctrl+C again to quit immediately"
+phase_learn = "learning"
+phase_scrub = "scrubbing"
+dry_run = "  (dry run — nothing was written)"
+preview_header = "==> {name} <=="
+preview_binary = "(binary, skipped)"
+preview_note = "(the mask mode changed the number of lines; showing the scrubbed text only)"
+rules_footer = "{active} of {total} rules are active at level {level}."
+categories_header = "Categories (● active at this level; id, default level, name):"
+test_found = "matches:"
+test_none = "no matches"
+config_written = "wrote {path}"
+languages_current = "(current)"
+bench_result = "{size} in {secs} s → {rate}/s with {threads} threads, {matches} items masked"
+yes = "yes"
+no = "no"
+
+[gui]
+title = "logblur — log scrubber"
+subtitle = "Scrub sensitive data from log archives, in memory"
+language = "Language"
+settings = "Settings"
+level = "Security level"
+level_extra = "Only when enabled"
+mask = "Mask mode"
+mask_char = "Mask character"
+salt = "Salt"
+salt_hint = "empty = random for each run"
+counter = "Counter pseudonyms (IP_1, IP_2…)"
+categories = "Categories"
+reset_categories = "Reset to the level defaults"
+options = "Options"
+keep_private_ips = "Keep private IP addresses"
+learn = "Learn user and host names first (two passes)"
+scrub_names = "Scrub file names inside archives"
+binary_drop = "Drop binary entries instead of copying them"
+utf8_out = "Write all text as UTF-8"
+report = "Write a report"
+allow = "Allow list (one per line)"
+deny = "Deny list (one per line)"
+out_dir = "Output folder"
+out_dir_same = "Next to each input"
+choose = "Choose…"
+reset = "Reset"
+advanced = "Advanced"
+threads = "Threads"
+auto = "automatic"
+memory = "Memory budget"
+memory_hint = "auto, 2G, 512M or 70%"
+privacy_note = "Everything runs locally. Unscrubbed text stays in memory and is never written to disk."
+drop_title = "Drop .zip / .tar.gz / .gz / log files or folders here"
+drop_hint = "or click to choose files"
+drop_release = "Release to add"
+pick_files = "Choose files…"
+pick_folder = "Choose folder…"
+queue = "{n} waiting"
+wayland_hint = "On Wayland, dragging files in may not work yet: use the buttons, or start the app with an empty WAYLAND_DISPLAY (WAYLAND_DISPLAY= logblur-gui) to run it through XWayland."
+config_error = "Invalid settings: {err}"
+phase_learn = "Pass 1 of 2 — learning user and host names"
+phase_scrub = "Scrubbing"
+cancel = "Cancel"
+speed = "{done} read · {rate}/s"
+results = "Results"
+clear_results = "Clear"
+no_results = "Nothing processed yet."
+entries_line = "{entries} entries · {text} text · {binary} binary · {skipped} skipped · {secs} s"
+masked_total = "{n} items masked"
+learned = "Learned identifiers: {n}"
+warnings = "Warnings ({n})"
+open_folder = "Open folder"
+open_report = "Open report"
+failed = "✘ {input}: {err}"
+cancelled = "{input}: cancelled, the unfinished output was removed"

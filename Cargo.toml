@@ -1,0 +1,27 @@
+[workspace]
+resolver = "3"
+members = ["crates/logblur-core", "crates/logblur-cli", "crates/logblur-gui"]
+default-members = ["crates/logblur-core", "crates/logblur-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+description = "Scrub sensitive data from Linux log archives (zip / tar.gz / files) in memory"
+
+[workspace.dependencies]
+logblur-core = { path = "crates/logblur-core" }
+crossbeam-channel = "0.5.17"
+
+[profile.dev]
+debug = "line-tables-only"
+
+# 依赖用优化编译：正则在 debug 构建下也要够快，测试才不会慢。
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
