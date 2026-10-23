@@ -8,6 +8,7 @@
 
 use std::collections::VecDeque;
 use std::io::{self, Write};
+use std::panic::RefUnwindSafe;
 use std::thread::JoinHandle;
 
 use crc32fast::Hasher;
@@ -88,6 +89,11 @@ impl<W: Write> ParDeflate<W> {
         self.inner.write_all(&out)
     }
 }
+
+// The pending `JoinHandle`s are not `RefUnwindSafe`, but nothing about a `ParDeflate` can be observed through a shared
+// reference, so a panic cannot leave state behind that `&ParDeflate` would expose. Declaring it keeps the sinks that own
+// one `RefUnwindSafe`, as they were before parallel compression.
+impl<W: Write + RefUnwindSafe> RefUnwindSafe for ParDeflate<W> {}
 
 impl<W: Write> Write for ParDeflate<W> {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
