@@ -6,12 +6,17 @@ default-members = ["crates/logblur-core", "crates/logblur"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.95"
 license = "MIT OR Apache-2.0"
 description = "Scrub sensitive data from Linux log archives (zip / tar.gz / files) in memory"
+repository = "https://github.com/HiroGitea/logblur"
+homepage = "https://github.com/HiroGitea/logblur"
+readme = "README.md"
+keywords = ["logs", "anonymization", "redaction", "privacy", "sanitize"]
+categories = ["command-line-utilities", "text-processing"]
 
 [workspace.dependencies]
-logblur-core = { path = "crates/logblur-core" }
+logblur-core = { path = "crates/logblur-core", version = "0.1.0" }
 crossbeam-channel = "0.5.17"
 
 [profile.dev]

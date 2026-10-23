@@ -4,7 +4,13 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description.workspace = true
+description = "Library behind logblur: detect and mask sensitive data in log archives, streaming and in memory"
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/logblur-core"
+readme.workspace = true
+keywords.workspace = true
+categories = ["text-processing", "compression"]
 
 [dependencies]
 regex = "1.13"
