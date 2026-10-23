@@ -66,9 +66,11 @@ Oct 23 11:02:44 HOST_4eq4e4is bash[999]: mysql -u root -pPWD_v3565g2m -h HOST_k2
   eight mask modes, from `░░░░` to consistent pseudonyms and salted hashes.
 * It handles text that isn't UTF-8. The encoding of each file is detected
   (GBK, Shift_JIS, windows-1252, …) and preserved in the output.
-* It is fast and bounded. Entries are scanned on all cores, large files are
-  streamed in chunks, and memory use stays within a budget (70% of available
-  memory by default).
+* It is fast and bounded. Performance has been optimized: a SIMD keyword
+  prefilter skips rules that cannot match and narrows the rest to the lines
+  that can, every core scans in parallel, large files are streamed in chunks,
+  and `.gz` / `.tar.gz` output is compressed on all cores. Memory use stays
+  within a budget (70% of available memory by default).
 * It tells you what it did. A summary after each run, and optionally a JSON or
   Markdown report listing every entry, what was masked by category, and what
   could *not* be scrubbed.
