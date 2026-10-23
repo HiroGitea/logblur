@@ -80,10 +80,21 @@ pub enum Phase {
 
 #[derive(Debug, Clone)]
 pub enum ProgressEvent {
-    Phase { phase: Phase, total_bytes: Option<u64>, total_entries: Option<u64> },
-    Entry { phase: Phase, index: u64, name: String },
+    Phase {
+        phase: Phase,
+        total_bytes: Option<u64>,
+        total_entries: Option<u64>,
+    },
+    Entry {
+        phase: Phase,
+        index: u64,
+        name: String,
+    },
     /// 已读取（解压后）的字节数。
-    Bytes { phase: Phase, done: u64 },
+    Bytes {
+        phase: Phase,
+        done: u64,
+    },
     Warning(String),
 }
 
@@ -179,7 +190,16 @@ pub fn run(spec: &JobSpec, cfg: &JobConfig, progress: &dyn ProgressSink, cancel:
     let raw_src = (r.input_kind == InputKind::Zip && r.output_kind == OutputKind::Zip).then_some(()).and(input_path);
     let spill_limit = (plan.budget / 4).min(usize::MAX as u64) as usize;
     let sink = create_sink(r.output_kind, r.output_path.as_deref(), spec.force, raw_src, spill_limit)?;
-    let ctx = Ctx::new(cfg, &engine, &plan, cancel, progress, Phase::Scrub, sink.supports_zip_blob(), sink.supports_raw_copy());
+    let ctx = Ctx::new(
+        cfg,
+        &engine,
+        &plan,
+        cancel,
+        progress,
+        Phase::Scrub,
+        sink.supports_zip_blob(),
+        sink.supports_raw_copy(),
+    );
     let (result, sink, entries) = pipeline::scrub_pass(&ctx, src.as_mut(), sink);
     warnings.extend(ctx.take_warnings());
     let output_size = match result {

@@ -4,12 +4,15 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use logblur_core::{BinaryPolicy, CancelToken, Error, Input, JobConfig, JobSpec, MaskMode, NoProgress, Output, Report, run};
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
+use logblur_core::{
+    BinaryPolicy, CancelToken, Error, Input, JobConfig, JobSpec, MaskMode, NoProgress, Output, Report, run,
+};
 use zip::write::SimpleFileOptions;
 
-const AUTH_LOG: &str = "Oct 23 11:12:13 web-prod-01 sshd[2211]: Failed password for invalid user admin2 from 203.0.113.45 port 52234 ssh2
+const AUTH_LOG: &str =
+    "Oct 23 11:12:13 web-prod-01 sshd[2211]: Failed password for invalid user admin2 from 203.0.113.45 port 52234 ssh2
 Oct 23 11:15:02 web-prod-01 sshd[2301]: Accepted publickey for alice from 198.51.100.7 port 50122 ssh2
 Oct 23 11:20:41 web-prod-01 sudo:    alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/bin/ls
 ";

@@ -177,7 +177,12 @@ impl Report {
         line(t!("report.matches", n = self.matches_total));
         s.push('\n');
         if self.matches_total > 0 {
-            s.push_str(&format!("## {}\n\n| {} | {} |\n|---|---:|\n", t!("report.by_category"), t!("report.col_category"), t!("report.col_count")));
+            s.push_str(&format!(
+                "## {}\n\n| {} | {} |\n|---|---:|\n",
+                t!("report.by_category"),
+                t!("report.col_category"),
+                t!("report.col_count")
+            ));
             for (c, n) in self.by_category.iter() {
                 s.push_str(&format!("| {} (`{}`) | {} |\n", c.label(), c.id(), n));
             }

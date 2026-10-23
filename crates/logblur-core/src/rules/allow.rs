@@ -10,35 +10,206 @@ use crate::error::{Error, Result};
 
 /// 系统/服务账户：出现在日志里不指向具体的人。
 const SYSTEM_USERS: &[&str] = &[
-    "root", "nobody", "nogroup", "daemon", "bin", "sys", "sync", "games", "man", "lp", "mail", "news", "uucp",
-    "proxy", "www-data", "backup", "list", "irc", "gnats", "_apt", "messagebus", "sshd", "systemd-network",
-    "systemd-resolve", "systemd-timesync", "systemd-journal", "systemd-coredump", "systemd-oom", "polkitd",
-    "avahi", "avahi-autoipd", "colord", "gdm", "lightdm", "sddm", "rtkit", "pulse", "geoclue", "saned",
-    "usbmux", "dnsmasq", "nm-openvpn", "nm-openconnect", "syslog", "uuidd", "tss", "tcpdump", "landscape",
-    "pollinate", "fwupd-refresh", "kernoops", "whoopsie", "speech-dispatcher", "cups-pk-helper", "hplip",
-    "postfix", "mysql", "postgres", "redis", "nginx", "apache", "http", "httpd", "chrony", "ntp", "_chrony",
-    "dbus", "adm", "operator", "ftp", "halt", "shutdown", "mongodb", "elasticsearch", "grafana", "prometheus",
-    "node_exporter", "docker", "containerd", "libvirt-qemu", "libvirt-dnsmasq", "qemu", "kvm", "zabbix",
-    "nagios", "jenkins", "gitlab-runner", "git", "ubuntu", "ec2-user", "centos", "debian", "admin", "user",
-    "guest", "test", "oracle", "pi", "vagrant", "ansible", "deploy", "system", "localhost", "anonymous",
-    "public", "default", "all users", "default user", "shared", "defaultapppool",
+    "root",
+    "nobody",
+    "nogroup",
+    "daemon",
+    "bin",
+    "sys",
+    "sync",
+    "games",
+    "man",
+    "lp",
+    "mail",
+    "news",
+    "uucp",
+    "proxy",
+    "www-data",
+    "backup",
+    "list",
+    "irc",
+    "gnats",
+    "_apt",
+    "messagebus",
+    "sshd",
+    "systemd-network",
+    "systemd-resolve",
+    "systemd-timesync",
+    "systemd-journal",
+    "systemd-coredump",
+    "systemd-oom",
+    "polkitd",
+    "avahi",
+    "avahi-autoipd",
+    "colord",
+    "gdm",
+    "lightdm",
+    "sddm",
+    "rtkit",
+    "pulse",
+    "geoclue",
+    "saned",
+    "usbmux",
+    "dnsmasq",
+    "nm-openvpn",
+    "nm-openconnect",
+    "syslog",
+    "uuidd",
+    "tss",
+    "tcpdump",
+    "landscape",
+    "pollinate",
+    "fwupd-refresh",
+    "kernoops",
+    "whoopsie",
+    "speech-dispatcher",
+    "cups-pk-helper",
+    "hplip",
+    "postfix",
+    "mysql",
+    "postgres",
+    "redis",
+    "nginx",
+    "apache",
+    "http",
+    "httpd",
+    "chrony",
+    "ntp",
+    "_chrony",
+    "dbus",
+    "adm",
+    "operator",
+    "ftp",
+    "halt",
+    "shutdown",
+    "mongodb",
+    "elasticsearch",
+    "grafana",
+    "prometheus",
+    "node_exporter",
+    "docker",
+    "containerd",
+    "libvirt-qemu",
+    "libvirt-dnsmasq",
+    "qemu",
+    "kvm",
+    "zabbix",
+    "nagios",
+    "jenkins",
+    "gitlab-runner",
+    "git",
+    "ubuntu",
+    "ec2-user",
+    "centos",
+    "debian",
+    "admin",
+    "user",
+    "guest",
+    "test",
+    "oracle",
+    "pi",
+    "vagrant",
+    "ansible",
+    "deploy",
+    "system",
+    "localhost",
+    "anonymous",
+    "public",
+    "default",
+    "all users",
+    "default user",
+    "shared",
+    "defaultapppool",
 ];
 
 /// 公共基础设施域名（软件源、镜像、证书、时间服务等），出现在日志里不是隐私。
 const PUBLIC_DOMAINS: &[&str] = &[
-    "debian.org", "debian.net", "ubuntu.com", "canonical.com", "launchpad.net", "launchpadcontent.net",
-    "snapcraft.io", "snapcraft.com", "archlinux.org", "fedoraproject.org", "redhat.com", "centos.org",
-    "rockylinux.org", "almalinux.org", "opensuse.org", "suse.com", "gentoo.org", "alpinelinux.org",
-    "linuxmint.com", "kernel.org", "gnu.org", "freedesktop.org", "gnome.org", "kde.org", "mozilla.org",
-    "mozilla.net", "github.com", "githubusercontent.com", "gitlab.com", "docker.com", "docker.io", "quay.io",
-    "ghcr.io", "gcr.io", "k8s.io", "kubernetes.io", "npmjs.org", "npmjs.com", "pypi.org", "pythonhosted.org",
-    "python.org", "crates.io", "rust-lang.org", "golang.org", "go.dev", "maven.org", "apache.org",
-    "nodejs.org", "flathub.org", "ntp.org", "ntppool.org", "letsencrypt.org", "digicert.com", "sectigo.com",
-    "microsoft.com", "windowsupdate.com", "apple.com", "google.com", "googleapis.com", "gstatic.com",
-    "cloudflare.com", "openssh.com", "openssl.org", "systemd.io", "aliyun.com", "tsinghua.edu.cn",
-    "ustc.edu.cn", "huaweicloud.com", "tencent.com", "nvidia.com", "intel.com", "amd.com", "rsyslog.com",
-    "nginx.org", "nginx.com", "postgresql.org", "mysql.com", "mariadb.org", "redis.io", "grafana.com",
-    "elastic.co", "jetbrains.com", "visualstudio.com", "vscode-cdn.net", "kde.org", "xfce.org",
+    "debian.org",
+    "debian.net",
+    "ubuntu.com",
+    "canonical.com",
+    "launchpad.net",
+    "launchpadcontent.net",
+    "snapcraft.io",
+    "snapcraft.com",
+    "archlinux.org",
+    "fedoraproject.org",
+    "redhat.com",
+    "centos.org",
+    "rockylinux.org",
+    "almalinux.org",
+    "opensuse.org",
+    "suse.com",
+    "gentoo.org",
+    "alpinelinux.org",
+    "linuxmint.com",
+    "kernel.org",
+    "gnu.org",
+    "freedesktop.org",
+    "gnome.org",
+    "kde.org",
+    "mozilla.org",
+    "mozilla.net",
+    "github.com",
+    "githubusercontent.com",
+    "gitlab.com",
+    "docker.com",
+    "docker.io",
+    "quay.io",
+    "ghcr.io",
+    "gcr.io",
+    "k8s.io",
+    "kubernetes.io",
+    "npmjs.org",
+    "npmjs.com",
+    "pypi.org",
+    "pythonhosted.org",
+    "python.org",
+    "crates.io",
+    "rust-lang.org",
+    "golang.org",
+    "go.dev",
+    "maven.org",
+    "apache.org",
+    "nodejs.org",
+    "flathub.org",
+    "ntp.org",
+    "ntppool.org",
+    "letsencrypt.org",
+    "digicert.com",
+    "sectigo.com",
+    "microsoft.com",
+    "windowsupdate.com",
+    "apple.com",
+    "google.com",
+    "googleapis.com",
+    "gstatic.com",
+    "cloudflare.com",
+    "openssh.com",
+    "openssl.org",
+    "systemd.io",
+    "aliyun.com",
+    "tsinghua.edu.cn",
+    "ustc.edu.cn",
+    "huaweicloud.com",
+    "tencent.com",
+    "nvidia.com",
+    "intel.com",
+    "amd.com",
+    "rsyslog.com",
+    "nginx.org",
+    "nginx.com",
+    "postgresql.org",
+    "mysql.com",
+    "mariadb.org",
+    "redis.io",
+    "grafana.com",
+    "elastic.co",
+    "jetbrains.com",
+    "visualstudio.com",
+    "vscode-cdn.net",
+    "kde.org",
+    "xfce.org",
 ];
 
 /// RFC 2606 / 6761 保留域名。
@@ -108,7 +279,9 @@ impl Allowlist {
                     .build()
                     .map_err(|e| Error::Config(crate::t!("config.bad_allow_regex", re = re, err = e)))?;
                 a.regex.push(r);
-            } else if let Some((ip, len)) = s.split_once('/').and_then(|(ip, l)| Some((ip.parse::<IpAddr>().ok()?, l.parse::<u8>().ok()?))) {
+            } else if let Some((ip, len)) =
+                s.split_once('/').and_then(|(ip, l)| Some((ip.parse::<IpAddr>().ok()?, l.parse::<u8>().ok()?)))
+            {
                 match ip {
                     IpAddr::V4(v4) if len <= 32 => a.v4.push(v4_net(v4.octets(), len)),
                     IpAddr::V6(v6) if len <= 128 => a.v6.push(v6_net(v6, len)),
@@ -140,23 +313,25 @@ impl Allowlist {
         if self.domain_suffix.iter().any(|d| domain_matches(&lower, d)) {
             return true;
         }
-        if self.suffix.iter().any(|s| lower.ends_with(s.as_str())) || self.prefix.iter().any(|p| lower.starts_with(p.as_str())) {
+        if self.suffix.iter().any(|s| lower.ends_with(s.as_str()))
+            || self.prefix.iter().any(|p| lower.starts_with(p.as_str()))
+        {
             return true;
         }
-        if !self.v4.is_empty() || !self.v6.is_empty() {
-            if let Some(ip) = parse_ip_loose(value) {
-                match ip {
-                    IpAddr::V4(v4) => {
-                        let x = u32::from(v4);
-                        if self.v4.iter().any(|&(net, mask)| x & mask == net) {
-                            return true;
-                        }
+        if (!self.v4.is_empty() || !self.v6.is_empty())
+            && let Some(ip) = parse_ip_loose(value)
+        {
+            match ip {
+                IpAddr::V4(v4) => {
+                    let x = u32::from(v4);
+                    if self.v4.iter().any(|&(net, mask)| x & mask == net) {
+                        return true;
                     }
-                    IpAddr::V6(v6) => {
-                        let x = u128::from(v6);
-                        if self.v6.iter().any(|&(net, mask)| x & mask == net) {
-                            return true;
-                        }
+                }
+                IpAddr::V6(v6) => {
+                    let x = u128::from(v6);
+                    if self.v6.iter().any(|&(net, mask)| x & mask == net) {
+                        return true;
                     }
                 }
             }
@@ -174,7 +349,8 @@ impl Allowlist {
 }
 
 fn domain_matches(host: &str, base: &str) -> bool {
-    host == base || (host.len() > base.len() && host.ends_with(base) && host.as_bytes()[host.len() - base.len() - 1] == b'.')
+    host == base
+        || (host.len() > base.len() && host.ends_with(base) && host.as_bytes()[host.len() - base.len() - 1] == b'.')
 }
 
 /// 去掉端口、方括号、zone 后解析 IP。
@@ -214,7 +390,7 @@ fn builtin_allowed(cat: Category, value: &str, keep_private: bool) -> bool {
         }
         Category::Mac => {
             let hex: Vec<u8> = value
-                .split(|c| c == ':' || c == '-' || c == '.')
+                .split([':', '-', '.'])
                 .flat_map(|p| (0..p.len() / 2).filter_map(move |i| u8::from_str_radix(&p[i * 2..i * 2 + 2], 16).ok()))
                 .collect();
             // 只对单个 6 字节 MAC 放行；iptables 的 MAC= 序列（目标+源+类型）总要打码
@@ -235,9 +411,7 @@ fn builtin_allowed(cat: Category, value: &str, keep_private: bool) -> bool {
             let u = value.trim_matches(|c| c == '\'' || c == '"').to_ascii_lowercase();
             SYSTEM_USERS.contains(&u.as_str()) || u.starts_with("systemd-") || u.starts_with('_')
         }
-        Category::Uuid | Category::MachineId => {
-            value.bytes().filter(u8::is_ascii_hexdigit).all(|b| b == b'0')
-        }
+        Category::Uuid | Category::MachineId => value.bytes().filter(u8::is_ascii_hexdigit).all(|b| b == b'0'),
         _ => false,
     }
 }

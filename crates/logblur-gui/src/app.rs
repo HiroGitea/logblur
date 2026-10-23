@@ -4,16 +4,16 @@ use std::collections::{BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use crossbeam_channel::{Receiver, Sender, unbounded};
+use eframe::egui::{self, Align, Align2, Color32, DroppedFile, FontId, Layout, RichText, Sense, Stroke, StrokeKind};
 use logblur_core::archive::sink::part_path;
 use logblur_core::archive::{default_output_path, detect_input};
 use logblur_core::report::default_report_path;
 use logblur_core::util::human_bytes;
 use logblur_core::{
-    BinaryPolicy, CancelToken, Category, Input, JobConfig, JobSpec, MaskMode, MemoryLimit, Output, OutputEncoding, Phase,
-    ProgressEvent, Report, ReportFormat, i18n, t,
+    BinaryPolicy, CancelToken, Category, Input, JobConfig, JobSpec, MaskMode, MemoryLimit, Output, OutputEncoding,
+    Phase, ProgressEvent, Report, ReportFormat, i18n, t,
 };
-use crossbeam_channel::{Receiver, Sender, unbounded};
-use eframe::egui::{self, Align, Align2, Color32, DroppedFile, FontId, Layout, RichText, Sense, Stroke, StrokeKind};
 
 // ───────────────────────── 设置 ─────────────────────────
 
@@ -276,7 +276,8 @@ impl App {
                 return;
             }
         };
-        let report_fmt = self.s.report.then_some(if self.s.report_md { ReportFormat::Markdown } else { ReportFormat::Json });
+        let report_fmt =
+            self.s.report.then_some(if self.s.report_md { ReportFormat::Markdown } else { ReportFormat::Json });
         let cancel = CancelToken::new();
         let tx = self.tx.clone();
         let ctx = ctx.clone();
@@ -322,7 +323,11 @@ impl App {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let current = i18n::language();
                 let langs = i18n::languages();
-                let name = langs.iter().find(|(tag, _)| *tag == current).map(|(_, n)| n.clone()).unwrap_or_else(|| current.clone());
+                let name = langs
+                    .iter()
+                    .find(|(tag, _)| *tag == current)
+                    .map(|(_, n)| n.clone())
+                    .unwrap_or_else(|| current.clone());
                 let mut selected = current.clone();
                 egui::ComboBox::from_id_salt("logblur_lang").selected_text(name).show_ui(ui, |ui| {
                     for (tag, n) in &langs {
@@ -345,8 +350,12 @@ impl App {
         ui.label(RichText::new(t!("gui.level")).strong());
         ui.add(egui::Slider::new(&mut s.level, 1u8..=4u8).integer());
         ui.label(
-            RichText::new(format!("{} — {}", t!(&format!("level.{}", s.level)), t!(&format!("level.{}_desc", s.level))))
-                .small(),
+            RichText::new(format!(
+                "{} — {}",
+                t!(&format!("level.{}", s.level)),
+                t!(&format!("level.{}_desc", s.level))
+            ))
+            .small(),
         );
         ui.separator();
 
@@ -439,10 +448,10 @@ impl App {
             }
         }
         ui.horizontal(|ui| {
-            if ui.button(t!("gui.choose")).clicked() {
-                if let Some(d) = rfd::FileDialog::new().pick_folder() {
-                    s.out_dir = Some(d);
-                }
+            if ui.button(t!("gui.choose")).clicked()
+                && let Some(d) = rfd::FileDialog::new().pick_folder()
+            {
+                s.out_dir = Some(d);
             }
             if s.out_dir.is_some() && ui.button(t!("gui.reset")).clicked() {
                 s.out_dir = None;
@@ -494,10 +503,10 @@ impl App {
             FontId::proportional(14.0),
             visuals.weak_text_color(),
         );
-        if resp.clicked() {
-            if let Some(files) = rfd::FileDialog::new().pick_files() {
-                self.enqueue(files);
-            }
+        if resp.clicked()
+            && let Some(files) = rfd::FileDialog::new().pick_files()
+        {
+            self.enqueue(files);
         }
     }
 
@@ -543,15 +552,15 @@ impl App {
         ui.add_space(6.0);
         let mut picked: Vec<PathBuf> = Vec::new();
         ui.horizontal(|ui| {
-            if ui.button(t!("gui.pick_files")).clicked() {
-                if let Some(f) = rfd::FileDialog::new().pick_files() {
-                    picked.extend(f);
-                }
+            if ui.button(t!("gui.pick_files")).clicked()
+                && let Some(f) = rfd::FileDialog::new().pick_files()
+            {
+                picked.extend(f);
             }
-            if ui.button(t!("gui.pick_folder")).clicked() {
-                if let Some(d) = rfd::FileDialog::new().pick_folder() {
-                    picked.push(d);
-                }
+            if ui.button(t!("gui.pick_folder")).clicked()
+                && let Some(d) = rfd::FileDialog::new().pick_folder()
+            {
+                picked.push(d);
             }
             if !self.queue.is_empty() {
                 ui.label(t!("gui.queue", n = self.queue.len()));
@@ -612,7 +621,7 @@ fn result_ui(ui: &mut egui::Ui, res: &JobResult) {
                 ));
                 ui.label(RichText::new(t!("gui.masked_total", n = r.matches_total)).strong());
                 let mut cats: Vec<(Category, u64)> = r.by_category.iter().collect();
-                cats.sort_by(|a, b| b.1.cmp(&a.1));
+                cats.sort_by_key(|c| std::cmp::Reverse(c.1));
                 if !cats.is_empty() {
                     egui::Grid::new("categories").num_columns(2).striped(true).show(ui, |ui| {
                         for (c, n) in cats.iter().take(12) {
@@ -635,15 +644,15 @@ fn result_ui(ui: &mut egui::Ui, res: &JobResult) {
                     });
                 }
                 ui.horizontal(|ui| {
-                    if ui.button(t!("gui.open_folder")).clicked() {
-                        if let Some(dir) = res.output.parent() {
-                            let _ = open::that(dir);
-                        }
+                    if ui.button(t!("gui.open_folder")).clicked()
+                        && let Some(dir) = res.output.parent()
+                    {
+                        let _ = open::that(dir);
                     }
-                    if let Some(rp) = &res.report_path {
-                        if ui.button(t!("gui.open_report")).clicked() {
-                            let _ = open::that(rp);
-                        }
+                    if let Some(rp) = &res.report_path
+                        && ui.button(t!("gui.open_report")).clicked()
+                    {
+                        let _ = open::that(rp);
                     }
                 });
             }

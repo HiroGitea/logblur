@@ -105,10 +105,7 @@ pub fn random_salt() -> Vec<u8> {
         h.write_u64(i);
         seed.extend_from_slice(&h.finish().to_le_bytes());
     }
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     seed.extend_from_slice(&now.to_le_bytes());
     seed.extend_from_slice(&std::process::id().to_le_bytes());
     sha256(&seed).to_vec()

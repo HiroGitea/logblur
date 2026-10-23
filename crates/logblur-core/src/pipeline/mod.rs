@@ -65,10 +65,10 @@ pub fn memory_budget(limit: MemoryLimit) -> u64 {
     if avail == 0 {
         avail = 1 << 30;
     }
-    if let Some(cg) = sys.cgroup_limits() {
-        if cg.free_memory > 0 {
-            avail = avail.min(cg.free_memory);
-        }
+    if let Some(cg) = sys.cgroup_limits()
+        && cg.free_memory > 0
+    {
+        avail = avail.min(cg.free_memory);
     }
     let b = match limit {
         MemoryLimit::Auto => avail / 10 * 7,
@@ -209,6 +209,7 @@ enum ChunkMode {
     Copy,
 }
 
+#[expect(clippy::large_enum_variant, reason = "Job 只在通道里移动，几百字节的拷贝相对处理数据可以忽略")]
 enum Job {
     Whole {
         seq: u64,
@@ -301,14 +302,24 @@ fn reader(ctx: &Ctx, src: &mut dyn Source, jobs: &Sender<Job>, out: &Sender<Piec
     })
 }
 
-fn entry(ctx: &Ctx, seq: u64, mut meta: EntryMeta, rd: Option<&mut dyn Read>, jobs: &Sender<Job>, out: &Sender<Piece>) -> Result<()> {
+fn entry(
+    ctx: &Ctx,
+    seq: u64,
+    mut meta: EntryMeta,
+    rd: Option<&mut dyn Read>,
+    jobs: &Sender<Job>,
+    out: &Sender<Piece>,
+) -> Result<()> {
     let learn = ctx.learning();
     if learn {
         // 文件名里也有用户名、主机名
         let mut set = HashSet::new();
         ctx.engine.learn(format!("/{}", meta.name).as_bytes(), &mut set);
         if !set.is_empty() {
-            send_piece(out, Piece { seq, part: 0, last: true, permit: 0, body: Body::Learned(set.into_iter().collect()) })?;
+            send_piece(
+                out,
+                Piece { seq, part: 0, last: true, permit: 0, body: Body::Learned(set.into_iter().collect()) },
+            )?;
         }
     }
     let mut name_counts = Counts::default();
@@ -367,12 +378,13 @@ fn file_entry(
         info.status = EntryStatus::Encrypted;
         info.set_note(crate::t!("pipeline.encrypted"));
         ctx.warn(crate::t!("pipeline.warn_encrypted", name = meta.name));
-        if ctx.cfg.binary == BinaryPolicy::Copy && ctx.sink_raw {
-            if let Some(idx) = meta.zip_index {
-                info.bytes_in = meta.size.unwrap_or(0);
-                info.bytes_out = info.bytes_in;
-                return send_piece(out, one(Body::RawCopy(Arc::new(meta), idx, info)));
-            }
+        if ctx.cfg.binary == BinaryPolicy::Copy
+            && ctx.sink_raw
+            && let Some(idx) = meta.zip_index
+        {
+            info.bytes_in = meta.size.unwrap_or(0);
+            info.bytes_out = info.bytes_in;
+            return send_piece(out, one(Body::RawCopy(Arc::new(meta), idx, info)));
         }
         info.status = EntryStatus::Dropped;
         return send_piece(out, one(Body::Skip(info)));
@@ -391,7 +403,8 @@ fn file_entry(
         if !text::detect(&peek, &inner_name, false).is_binary() {
             let mut dec = MultiGzDecoder::new(Cursor::new(head).chain(rd));
             let mut head2 = Vec::new();
-            let eof2 = read_up_to(&mut dec, &mut head2, SAMPLE_LEN).ctx(|| crate::t!("io.decompress", path = meta.name))?;
+            let eof2 =
+                read_up_to(&mut dec, &mut head2, SAMPLE_LEN).ctx(|| crate::t!("io.decompress", path = meta.name))?;
             let kind = text::detect(&head2, &inner_name, eof2);
             info.set_note(crate::t!("pipeline.gz_note"));
             return content_entry(ctx, seq, meta, &mut dec, head2, eof2, kind, true, info, jobs, out);
@@ -429,14 +442,18 @@ fn content_entry(
             info.status = EntryStatus::Dropped;
             return send_piece(out, Piece { seq, part: 0, last: true, permit: 0, body: Body::Skip(info) });
         }
-        if !inner_gz && ctx.sink_raw {
-            if let Some(idx) = meta.zip_index {
-                let n = meta.size.unwrap_or(0);
-                info.bytes_in = n;
-                info.bytes_out = n;
-                ctx.add_bytes(n);
-                return send_piece(out, Piece { seq, part: 0, last: true, permit: 0, body: Body::RawCopy(Arc::new(meta), idx, info) });
-            }
+        if !inner_gz
+            && ctx.sink_raw
+            && let Some(idx) = meta.zip_index
+        {
+            let n = meta.size.unwrap_or(0);
+            info.bytes_in = n;
+            info.bytes_out = n;
+            ctx.add_bytes(n);
+            return send_piece(
+                out,
+                Piece { seq, part: 0, last: true, permit: 0, body: Body::RawCopy(Arc::new(meta), idx, info) },
+            );
         }
     } else {
         info.encoding = Some(kind.label());
@@ -482,7 +499,9 @@ fn stream_entry(
     let (mode, decoder, skip) = match kind {
         TextKind::Binary(_) => (ChunkMode::Copy, None, 0),
         TextKind::Utf8 { .. } => (ChunkMode::Utf8, None, 0),
-        TextKind::Legacy { enc, bom_len } => (ChunkMode::Legacy(enc), Some(StreamDecoder::new(enc)), bom_len.min(initial.len())),
+        TextKind::Legacy { enc, bom_len } => {
+            (ChunkMode::Legacy(enc), Some(StreamDecoder::new(enc)), bom_len.min(initial.len()))
+        }
     };
     let mut prefix = if ctx.utf8_out { Vec::new() } else { initial[..skip].to_vec() };
     let mut ch = Chunker::new(ctx.plan.chunk, !matches!(mode, ChunkMode::Copy), decoder);
@@ -492,7 +511,10 @@ fn stream_entry(
     let name = meta.name.clone();
     let meta = Arc::new(meta);
     if !learn {
-        send_piece(out, Piece { seq, part: 0, last: false, permit: 0, body: Body::Begin { meta: meta.clone(), inner_gz, info } })?;
+        send_piece(
+            out,
+            Piece { seq, part: 0, last: false, permit: 0, body: Body::Begin { meta: meta.clone(), inner_gz, info } },
+        )?;
     }
     let mut part = 0u32;
     let mut emit = |data: Vec<u8>, last: bool, note: Option<String>| -> Result<()> {
@@ -653,7 +675,10 @@ fn process(ctx: &Ctx, job: Job, out: &Sender<Piece>) -> Result<()> {
                     }
                 }
             };
-            send_piece(out, Piece { seq, part, last, permit, body: Body::Chunk { data: bytes, counts, bytes_in, note } })
+            send_piece(
+                out,
+                Piece { seq, part, last, permit, body: Body::Chunk { data: bytes, counts, bytes_in, note } },
+            )
         }
     }
 }
@@ -691,7 +716,13 @@ fn finish_stream(st: Stream, sink: &mut dyn Sink, entries: &mut Vec<EntryReport>
     Ok(())
 }
 
-fn handle(body: Body, last: bool, sink: &mut dyn Sink, stream: &mut Option<Stream>, entries: &mut Vec<EntryReport>) -> Result<()> {
+fn handle(
+    body: Body,
+    last: bool,
+    sink: &mut dyn Sink,
+    stream: &mut Option<Stream>,
+    entries: &mut Vec<EntryReport>,
+) -> Result<()> {
     match body {
         Body::Dir(meta, info) => {
             sink.dir(&meta)?;
@@ -799,7 +830,11 @@ fn learn_collector(ctx: &Ctx, rx: Receiver<Piece>) -> HashSet<(Category, String)
 // ───────────────────────── 入口 ─────────────────────────
 
 /// 第二遍：清洗并写出。返回条目报告和输出端（由调用者 finish / abort）。
-pub fn scrub_pass(ctx: &Ctx, src: &mut dyn Source, sink: Box<dyn Sink>) -> (Result<()>, Box<dyn Sink>, Vec<EntryReport>) {
+pub fn scrub_pass(
+    ctx: &Ctx,
+    src: &mut dyn Source,
+    sink: Box<dyn Sink>,
+) -> (Result<()>, Box<dyn Sink>, Vec<EntryReport>) {
     let (job_tx, job_rx) = bounded::<Job>(ctx.plan.workers * 2);
     let (out_tx, out_rx) = unbounded::<Piece>();
     let (sink, entries) = std::thread::scope(|s| {

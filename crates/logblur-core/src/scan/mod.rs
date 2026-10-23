@@ -264,11 +264,12 @@ impl Engine {
                 locs.get(c.rule.group)
             };
             let mut next = ms + 1;
-            if let Some((ps, pe)) = span {
-                if pe > ps && self.accept(&c.rule, hay, ms, me, ps, pe, protect) {
-                    hit(ps, pe);
-                    next = next.max(pe);
-                }
+            if let Some((ps, pe)) = span
+                && pe > ps
+                && self.accept(&c.rule, hay, ms, me, ps, pe, protect)
+            {
+                hit(ps, pe);
+                next = next.max(pe);
             }
             pos = ceil_char_boundary(hay, next);
             if pos > hay.len() || (pos == hay.len() && ms == hay.len()) {
@@ -278,11 +279,20 @@ impl Engine {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn accept(&self, r: &Rule, hay: &[u8], ms: usize, me: usize, ps: usize, pe: usize, protect: &[(usize, usize)]) -> bool {
-        if let Some(after) = r.after {
-            if !after(&hay[pe..]) {
-                return false;
-            }
+    fn accept(
+        &self,
+        r: &Rule,
+        hay: &[u8],
+        ms: usize,
+        me: usize,
+        ps: usize,
+        pe: usize,
+        protect: &[(usize, usize)],
+    ) -> bool {
+        if let Some(after) = r.after
+            && !after(&hay[pe..])
+        {
+            return false;
         }
         if r.protect && !protect.is_empty() {
             let i = protect.partition_point(|&(_, e)| e <= ps);
@@ -292,7 +302,8 @@ impl Engine {
         }
         let payload = as_str(&hay[ps..pe]);
         if let Some(v) = r.validator {
-            let line_start = memchr::memrchr(b'\n', &hay[ps.saturating_sub(64)..ps]).map(|i| ps.saturating_sub(64) + i + 1);
+            let line_start =
+                memchr::memrchr(b'\n', &hay[ps.saturating_sub(64)..ps]).map(|i| ps.saturating_sub(64) + i + 1);
             let bstart = line_start.unwrap_or(ps.saturating_sub(64));
             let whole = as_str(&hay[ms..me]);
             let cand = Cand {
@@ -408,10 +419,12 @@ impl Engine {
         };
         for (cat, v) in values {
             // FQDN 的第一段（短主机名）也要学
-            if cat == Category::Hostname && v.contains('.') && !v.bytes().all(|b| b.is_ascii_digit() || b == b'.') {
-                if let Some(short) = v.split('.').next() {
-                    push(cat, short.to_string(), &mut uniq);
-                }
+            if cat == Category::Hostname
+                && v.contains('.')
+                && !v.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+                && let Some(short) = v.split('.').next()
+            {
+                push(cat, short.to_string(), &mut uniq);
             }
             push(cat, v, &mut uniq);
         }

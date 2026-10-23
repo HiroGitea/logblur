@@ -15,17 +15,17 @@ pub fn resolve(found: &mut Vec<Found>, prio: impl Fn(&Found) -> u32) {
     for f in found.drain(..) {
         let len = f.end - f.start;
         let p = prio(&f);
-        if let Some(last) = out.last_mut() {
-            if f.start < last.end {
-                last.end = last.end.max(f.end);
-                let b = best.last_mut().expect("与 out 同步");
-                if len > b.0 || (len == b.0 && p < b.1) {
-                    *b = (len, p);
-                    last.category = f.category;
-                    last.rule = f.rule;
-                }
-                continue;
+        if let Some(last) = out.last_mut()
+            && f.start < last.end
+        {
+            last.end = last.end.max(f.end);
+            let b = best.last_mut().expect("与 out 同步");
+            if len > b.0 || (len == b.0 && p < b.1) {
+                *b = (len, p);
+                last.category = f.category;
+                last.rule = f.rule;
             }
+            continue;
         }
         best.push((len, p));
         out.push(f);

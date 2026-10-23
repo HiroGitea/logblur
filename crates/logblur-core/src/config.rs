@@ -288,8 +288,7 @@ impl JobConfig {
     /// 读取 TOML 配置文件并合并到当前配置。
     pub fn apply_file(&mut self, path: &Path) -> Result<()> {
         let text = std::fs::read_to_string(path).map_err(|e| Error::io_path("io.read_config", path, e))?;
-        let fc: FileConfig =
-            toml::from_str(&text).map_err(|e| Error::Config(format!("{}: {e}", path.display())))?;
+        let fc: FileConfig = toml::from_str(&text).map_err(|e| Error::Config(format!("{}: {e}", path.display())))?;
         self.apply(fc)
     }
 

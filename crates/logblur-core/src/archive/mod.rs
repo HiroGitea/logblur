@@ -137,7 +137,9 @@ pub fn detect_input(path: &Path) -> Result<InputKind> {
         return Ok(InputKind::Zip);
     }
     if head.starts_with(&[0x1f, 0x8b]) {
-        let mut dec = flate2::read::MultiGzDecoder::new(BufReader::new(File::open(path).map_err(|e| Error::io_path("io.open", path, e))?));
+        let mut dec = flate2::read::MultiGzDecoder::new(BufReader::new(
+            File::open(path).map_err(|e| Error::io_path("io.open", path, e))?,
+        ));
         let mut inner = Vec::new();
         let _ = read_up_to(&mut dec, &mut inner, 512);
         let ustar = inner.len() > 262 && &inner[257..262] == b"ustar";
@@ -156,14 +158,10 @@ pub fn detect_input(path: &Path) -> Result<InputKind> {
 /// `syslog.2.gz → syslog.2.blurred.gz`、`dir → dir.blurred.zip`。
 pub fn default_output_path(input: &Path, kind: InputKind) -> PathBuf {
     let parent = input.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
-    let name = input
-        .file_name()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "output".to_string());
+    let name = input.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "output".to_string());
     let lower = name.to_ascii_lowercase();
-    let split = |suffix_len: usize, ext: &str| -> String {
-        format!("{}.blurred{}", &name[..name.len() - suffix_len], ext)
-    };
+    let split =
+        |suffix_len: usize, ext: &str| -> String { format!("{}.blurred{}", &name[..name.len() - suffix_len], ext) };
     let file_name = match kind {
         InputKind::Dir => format!("{}.blurred.zip", name.trim_end_matches(['/', '\\'])),
         InputKind::TarGz if lower.ends_with(".tar.gz") => split(7, ".tar.gz"),
@@ -176,9 +174,7 @@ pub fn default_output_path(input: &Path, kind: InputKind) -> PathBuf {
         InputKind::Gz if lower.ends_with(".gz") => split(3, ".gz"),
         InputKind::Gz => format!("{name}.blurred.gz"),
         InputKind::File | InputKind::Stdin => match name.rsplit_once('.') {
-            Some((stem, ext))
-                if !stem.is_empty() && ext.len() <= 8 && ext.bytes().any(|b| b.is_ascii_alphabetic()) =>
-            {
+            Some((stem, ext)) if !stem.is_empty() && ext.len() <= 8 && ext.bytes().any(|b| b.is_ascii_alphabetic()) => {
                 format!("{stem}.blurred.{ext}")
             }
             _ => format!("{name}.blurred"),

@@ -47,9 +47,14 @@ impl BinaryKind {
 pub enum TextKind {
     Binary(BinaryKind),
     /// UTF-8（可能夹杂少量非法字节），直接扫描原始字节。
-    Utf8 { bom: bool },
+    Utf8 {
+        bom: bool,
+    },
     /// 需要解码的编码。`bom_len` 是要跳过（并在输出时原样写回）的 BOM 字节数。
-    Legacy { enc: &'static Encoding, bom_len: usize },
+    Legacy {
+        enc: &'static Encoding,
+        bom_len: usize,
+    },
 }
 
 impl TextKind {
@@ -85,19 +90,17 @@ fn magic(sample: &[u8], name: &str) -> Option<BinaryKind> {
     {
         return Some(BinaryKind::LoginRecords);
     }
-    let m: &'static str = if starts(b"PK\x03\x04") || starts(b"PK\x05\x06") || starts(b"PK\x07\x08") {
-        "nested_archive"
-    } else if starts(&[0x1f, 0x8b]) {
-        "nested_archive"
-    } else if starts(&[0xfd, b'7', b'z', b'X', b'Z', 0]) {
-        "nested_archive"
-    } else if starts(&[0x28, 0xb5, 0x2f, 0xfd]) {
-        "nested_archive"
-    } else if sample.len() >= 4 && starts(b"BZh") && (b'1'..=b'9').contains(&sample[3]) {
-        "nested_archive"
-    } else if starts(&[b'7', b'z', 0xbc, 0xaf, 0x27, 0x1c]) || starts(b"Rar!\x1a\x07") {
-        "nested_archive"
-    } else if sample.len() > 262 && &sample[257..262] == b"ustar" {
+    let nested_archive = starts(b"PK\x03\x04")
+        || starts(b"PK\x05\x06")
+        || starts(b"PK\x07\x08")
+        || starts(&[0x1f, 0x8b])
+        || starts(&[0xfd, b'7', b'z', b'X', b'Z', 0])
+        || starts(&[0x28, 0xb5, 0x2f, 0xfd])
+        || (sample.len() >= 4 && starts(b"BZh") && (b'1'..=b'9').contains(&sample[3]))
+        || starts(&[b'7', b'z', 0xbc, 0xaf, 0x27, 0x1c])
+        || starts(b"Rar!\x1a\x07")
+        || (sample.len() > 262 && &sample[257..262] == b"ustar");
+    let m: &'static str = if nested_archive {
         "nested_archive"
     } else if starts(b"\x7fELF") {
         "elf"
@@ -107,9 +110,15 @@ fn magic(sample: &[u8], name: &str) -> Option<BinaryKind> {
         "pdf"
     } else if starts(b"SQLite format 3\0") {
         "sqlite"
-    } else if starts(&[0xd4, 0xc3, 0xb2, 0xa1]) || starts(&[0xa1, 0xb2, 0xc3, 0xd4]) || starts(&[0x0a, 0x0d, 0x0d, 0x0a]) {
+    } else if starts(&[0xd4, 0xc3, 0xb2, 0xa1])
+        || starts(&[0xa1, 0xb2, 0xc3, 0xd4])
+        || starts(&[0x0a, 0x0d, 0x0d, 0x0a])
+    {
         "pcap"
-    } else if starts(&[0xca, 0xfe, 0xba, 0xbe]) || starts(&[0xcf, 0xfa, 0xed, 0xfe]) || starts(&[0xfe, 0xed, 0xfa, 0xcf]) {
+    } else if starts(&[0xca, 0xfe, 0xba, 0xbe])
+        || starts(&[0xcf, 0xfa, 0xed, 0xfe])
+        || starts(&[0xfe, 0xed, 0xfa, 0xcf])
+    {
         "executable"
     } else {
         return None;
@@ -172,10 +181,8 @@ pub fn detect(sample: &[u8], name: &str, complete: bool) -> TextKind {
     if memchr::memchr(0, probe).is_some() {
         return TextKind::Binary(BinaryKind::Nul);
     }
-    let control = probe
-        .iter()
-        .filter(|&&b| b < 0x20 && !matches!(b, b'\t' | b'\n' | b'\r' | 0x0b | 0x0c | 0x1b | 0x08))
-        .count();
+    let control =
+        probe.iter().filter(|&&b| b < 0x20 && !matches!(b, b'\t' | b'\n' | b'\r' | 0x0b | 0x0c | 0x1b | 0x08)).count();
     if !probe.is_empty() && control * 20 > probe.len() {
         return TextKind::Binary(BinaryKind::Control);
     }

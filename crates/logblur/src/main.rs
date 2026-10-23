@@ -6,17 +6,17 @@ use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+use clap::{Args, Parser, Subcommand, ValueEnum};
+use indicatif::{ProgressBar, ProgressStyle};
 use logblur_core::archive::{EntryKind, default_output_path, detect_input, open_source, read_up_to};
 use logblur_core::category::Counts;
 use logblur_core::report::default_report_path;
 use logblur_core::scan::Engine;
 use logblur_core::util::{human_bytes, parse_size};
 use logblur_core::{
-    BinaryPolicy, CancelToken, Category, Input, JobConfig, JobSpec, MaskMode, MemoryLimit, Output, OutputEncoding, Phase,
-    ProgressEvent, ProgressSink, Report, ReportFormat, i18n, t,
+    BinaryPolicy, CancelToken, Category, Input, JobConfig, JobSpec, MaskMode, MemoryLimit, Output, OutputEncoding,
+    Phase, ProgressEvent, ProgressSink, Report, ReportFormat, i18n, t,
 };
-use clap::{Args, Parser, Subcommand, ValueEnum};
-use indicatif::{ProgressBar, ProgressStyle};
 
 // ───────────────────────── 命令行定义 ─────────────────────────
 
@@ -64,6 +64,7 @@ enum Command {
 }
 
 #[derive(Subcommand, Debug)]
+#[expect(clippy::large_enum_variant, reason = "命令行只解析一次")]
 enum RulesCmd {
     #[command(about = t!("cli.cmd.rules_list"))]
     List {
@@ -219,7 +220,9 @@ impl From<logblur_core::Error> for CliError {
     fn from(e: logblur_core::Error) -> Self {
         let code = match &e {
             logblur_core::Error::Cancelled => 3,
-            logblur_core::Error::Config(_) | logblur_core::Error::Rule { .. } | logblur_core::Error::OutputExists(_) => 1,
+            logblur_core::Error::Config(_)
+            | logblur_core::Error::Rule { .. }
+            | logblur_core::Error::OutputExists(_) => 1,
             _ => 2,
         };
         CliError { msg: e.to_string(), code }
@@ -285,8 +288,8 @@ fn expand_list(items: &[String]) -> CliResult<Vec<String>> {
     for item in items {
         match item.strip_prefix('@') {
             Some(path) => {
-                let text = std::fs::read_to_string(path)
-                    .map_err(|e| usage(t!("cli.msg.read_list", path = path, err = e)))?;
+                let text =
+                    std::fs::read_to_string(path).map_err(|e| usage(t!("cli.msg.read_list", path = path, err = e)))?;
                 out.extend(
                     text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).map(str::to_string),
                 );
@@ -382,9 +385,11 @@ impl CliProgress {
     }
 
     fn bar_style() -> ProgressStyle {
-        ProgressStyle::with_template("{prefix:.bold} [{bar:30.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta} {wide_msg}")
-            .unwrap_or_else(|_| ProgressStyle::default_bar())
-            .progress_chars("=> ")
+        ProgressStyle::with_template(
+            "{prefix:.bold} [{bar:30.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta} {wide_msg}",
+        )
+        .unwrap_or_else(|_| ProgressStyle::default_bar())
+        .progress_chars("=> ")
     }
 
     fn spinner_style() -> ProgressStyle {
@@ -491,7 +496,7 @@ fn print_summary(input: &str, r: &Report) {
         )
     );
     let mut cats: Vec<(Category, u64)> = r.by_category.iter().collect();
-    cats.sort_by(|a, b| b.1.cmp(&a.1));
+    cats.sort_by_key(|c| std::cmp::Reverse(c.1));
     if !cats.is_empty() {
         let list: Vec<String> = cats.iter().take(8).map(|(c, n)| format!("{} {n}", c.label())).collect();
         eprintln!("{}", t!("cli.msg.top_categories", list = list.join(", ")));
@@ -795,14 +800,34 @@ fn synth_block(target: usize) -> Vec<u8> {
     while s.len() < target {
         let n = i % 250 + 1;
         let line = match i % 8 {
-            0 => format!("Oct 23 11:{:02}:{:02} web-{n:03} sshd[{i}]: Failed password for invalid user u{n} from 203.0.113.{n} port {} ssh2\n", i / 60 % 60, i % 60, 40000 + n),
-            1 => format!("Oct 23 11:00:00 web-{n:03} sshd[{i}]: Accepted publickey for alice{n} from 198.51.100.{n} port 50122 ssh2: ED25519 SHA256:Hx2b1QKcOoa1L3dHmC7yJ4z5eQ8mN0pR6sT9uV2wX3Y\n"),
-            2 => format!("Oct 23 11:00:01 web-{n:03} kernel: [{i}.123456] IN=eth0 OUT= MAC=ff:ff:ff:ff:ff:ff:52:54:00:12:34:{:02x}:08:00 SRC=192.0.2.{n} DST=192.0.2.255 LEN=78 PROTO=UDP\n", n % 256),
-            3 => format!("Oct 23 11:00:02 web-{n:03} systemd[1]: Started session-{i}.scope - Session {i} of User bob{n}.\n"),
-            4 => format!("2026-10-23T11:00:03Z app[{i}] INFO request id={i} user=carol{n}@acme-corp.internal token=9f8e7d6c5b4a3928{n:04} took 12ms\n"),
-            5 => format!("Oct 23 11:00:04 web-{n:03} dhclient[612]: DHCPACK of 10.0.{n}.23 from 10.0.{n}.1 (xid=0x5a3c2e1f)\n"),
-            6 => format!("Oct 23 11:00:05 web-{n:03} nginx[1200]: 203.0.113.{n} - - \"GET /api/v1/items?page={n} HTTP/1.1\" 200 512 \"-\" \"curl/8.5.0\"\n"),
-            _ => format!("Oct 23 11:00:06 web-{n:03} kernel: [{i}.000001] EXT4-fs (sda2): mounted filesystem with ordered data mode. Quota mode: none.\n"),
+            0 => format!(
+                "Oct 23 11:{:02}:{:02} web-{n:03} sshd[{i}]: Failed password for invalid user u{n} from 203.0.113.{n} port {} ssh2\n",
+                i / 60 % 60,
+                i % 60,
+                40000 + n
+            ),
+            1 => format!(
+                "Oct 23 11:00:00 web-{n:03} sshd[{i}]: Accepted publickey for alice{n} from 198.51.100.{n} port 50122 ssh2: ED25519 SHA256:Hx2b1QKcOoa1L3dHmC7yJ4z5eQ8mN0pR6sT9uV2wX3Y\n"
+            ),
+            2 => format!(
+                "Oct 23 11:00:01 web-{n:03} kernel: [{i}.123456] IN=eth0 OUT= MAC=ff:ff:ff:ff:ff:ff:52:54:00:12:34:{:02x}:08:00 SRC=192.0.2.{n} DST=192.0.2.255 LEN=78 PROTO=UDP\n",
+                n % 256
+            ),
+            3 => format!(
+                "Oct 23 11:00:02 web-{n:03} systemd[1]: Started session-{i}.scope - Session {i} of User bob{n}.\n"
+            ),
+            4 => format!(
+                "2026-10-23T11:00:03Z app[{i}] INFO request id={i} user=carol{n}@acme-corp.internal token=9f8e7d6c5b4a3928{n:04} took 12ms\n"
+            ),
+            5 => format!(
+                "Oct 23 11:00:04 web-{n:03} dhclient[612]: DHCPACK of 10.0.{n}.23 from 10.0.{n}.1 (xid=0x5a3c2e1f)\n"
+            ),
+            6 => format!(
+                "Oct 23 11:00:05 web-{n:03} nginx[1200]: 203.0.113.{n} - - \"GET /api/v1/items?page={n} HTTP/1.1\" 200 512 \"-\" \"curl/8.5.0\"\n"
+            ),
+            _ => format!(
+                "Oct 23 11:00:06 web-{n:03} kernel: [{i}.000001] EXT4-fs (sda2): mounted filesystem with ordered data mode. Quota mode: none.\n"
+            ),
         };
         s.push_str(&line);
         i += 1;

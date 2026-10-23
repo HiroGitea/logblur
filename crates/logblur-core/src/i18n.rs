@@ -16,7 +16,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 /// 内置语言文件。
-const BUILTIN: &[(&str, &str)] = &[("en", include_str!("../locales/en.toml")), ("zh-CN", include_str!("../locales/zh-CN.toml"))];
+const BUILTIN: &[(&str, &str)] =
+    &[("en", include_str!("../locales/en.toml")), ("zh-CN", include_str!("../locales/zh-CN.toml"))];
 
 #[derive(Debug, Clone)]
 struct Catalog {
@@ -57,10 +58,10 @@ fn parse_catalog(hint: &str, text: &str) -> Option<Catalog> {
 
 fn external_dirs() -> Vec<PathBuf> {
     let mut v = Vec::new();
-    if let Some(d) = std::env::var_os("LOGBLUR_LOCALE_DIR") {
-        if !d.is_empty() {
-            v.push(PathBuf::from(d));
-        }
+    if let Some(d) = std::env::var_os("LOGBLUR_LOCALE_DIR")
+        && !d.is_empty()
+    {
+        v.push(PathBuf::from(d));
     }
     match std::env::var_os("XDG_DATA_HOME") {
         Some(d) if !d.is_empty() => v.push(PathBuf::from(d).join("logblur").join("locales")),
@@ -82,11 +83,8 @@ fn load_all() -> Vec<Catalog> {
     // 低优先级的目录先加载，高优先级的后加载覆盖
     for dir in external_dirs().into_iter().rev() {
         let Ok(rd) = std::fs::read_dir(&dir) else { continue };
-        let mut files: Vec<PathBuf> = rd
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|x| x == "toml"))
-            .collect();
+        let mut files: Vec<PathBuf> =
+            rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "toml")).collect();
         files.sort();
         for p in files {
             let Ok(text) = std::fs::read_to_string(&p) else { continue };
@@ -139,10 +137,10 @@ fn candidates(explicit: Option<&str>, system: Option<&str>) -> Vec<String> {
         v.extend(l.split(':').filter(|s| !s.is_empty()).map(str::to_string));
     }
     for k in ["LC_ALL", "LC_MESSAGES", "LANG"] {
-        if let Ok(x) = std::env::var(k) {
-            if !x.is_empty() {
-                v.push(x);
-            }
+        if let Ok(x) = std::env::var(k)
+            && !x.is_empty()
+        {
+            v.push(x);
         }
     }
     if let Some(s) = system {

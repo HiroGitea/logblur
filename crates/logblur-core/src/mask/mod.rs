@@ -120,7 +120,7 @@ impl Masker {
             MaskMode::Remove => {}
             MaskMode::Hash => {
                 let h = hex_lower(&self.digest(cat, payload));
-                out.extend_from_slice(h[..self.hash_len.min(h.len())].as_bytes());
+                out.extend_from_slice(&h.as_bytes()[..self.hash_len.min(h.len())]);
             }
             MaskMode::Pseudo => {
                 out.extend_from_slice(cat.pseudo_prefix().as_bytes());
@@ -141,7 +141,7 @@ impl Masker {
                     out.extend_from_slice(n.to_string().as_bytes());
                 } else {
                     let b32 = base32_lower(&self.digest(cat, payload));
-                    out.extend_from_slice(b32[..8].as_bytes());
+                    out.extend_from_slice(&b32.as_bytes()[..8]);
                 }
             }
             MaskMode::Partial => partial(cat, payload, ch, out),
@@ -192,7 +192,11 @@ fn partial(cat: Category, payload: &str, ch: char, out: &mut Vec<u8>) {
             let mut seen = 0usize;
             for c in payload.chars() {
                 if c.is_ascii_alphanumeric() {
-                    if seen >= keep_from && total > 6 { Masker::push_char(out, c) } else { Masker::push_char(out, ch) }
+                    if seen >= keep_from && total > 6 {
+                        Masker::push_char(out, c)
+                    } else {
+                        Masker::push_char(out, ch)
+                    }
                     seen += 1;
                 } else {
                     Masker::push_char(out, c);
@@ -220,7 +224,11 @@ fn partial(cat: Category, payload: &str, ch: char, out: &mut Vec<u8>) {
             let mut in_octet = 0usize;
             for c in payload.chars() {
                 if c.is_ascii_hexdigit() {
-                    if octet < 3 { Masker::push_char(out, c) } else { Masker::push_char(out, ch) }
+                    if octet < 3 {
+                        Masker::push_char(out, c)
+                    } else {
+                        Masker::push_char(out, ch)
+                    }
                     in_octet += 1;
                     if in_octet == 2 {
                         octet += 1;
@@ -241,7 +249,7 @@ fn partial(cat: Category, payload: &str, ch: char, out: &mut Vec<u8>) {
         },
         Url => match payload.find("://") {
             Some(i) => {
-                out.extend_from_slice(payload[..i + 3].as_bytes());
+                out.extend_from_slice(&payload.as_bytes()[..i + 3]);
                 masked(&payload[i + 3..], out);
             }
             None => masked(payload, out),

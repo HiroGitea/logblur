@@ -79,7 +79,7 @@ impl Chunker {
         let mut cut = match memrchr(b'\n', &self.buf[..limit]) {
             Some(i) => i + 1,
             None => match memchr(b'\n', &self.buf[limit..]) {
-                Some(j) if limit + j + 1 <= self.max_line => limit + j + 1,
+                Some(j) if limit + j < self.max_line => limit + j + 1,
                 _ => {
                     if !eof && self.buf.len() < self.max_line {
                         return None;
@@ -121,10 +121,10 @@ fn hard_cut(buf: &[u8], chunk: usize) -> usize {
 fn pem_extend(buf: &[u8], cut: usize) -> PemCut {
     let head = &buf[..cut];
     let Some(b) = memmem::rfind(head, b"-----BEGIN ") else { return PemCut::Keep };
-    if let Some(e) = memmem::rfind(head, b"-----END ") {
-        if e > b {
-            return PemCut::Keep;
-        }
+    if let Some(e) = memmem::rfind(head, b"-----END ")
+        && e > b
+    {
+        return PemCut::Keep;
     }
     if cut - b > PEM_MAX {
         return PemCut::Keep;

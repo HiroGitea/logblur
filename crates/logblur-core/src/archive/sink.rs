@@ -73,9 +73,9 @@ fn commit(part: &Path, final_path: &Path, force: bool) -> Result<()> {
 fn size_of(p: &Path) -> u64 {
     fn walk(p: &Path) -> u64 {
         match fs::symlink_metadata(p) {
-            Ok(md) if md.is_dir() => fs::read_dir(p)
-                .map(|it| it.filter_map(|e| e.ok()).map(|e| walk(&e.path())).sum())
-                .unwrap_or(0),
+            Ok(md) if md.is_dir() => {
+                fs::read_dir(p).map(|it| it.filter_map(|e| e.ok()).map(|e| walk(&e.path())).sum()).unwrap_or(0)
+            }
             Ok(md) => md.len(),
             Err(_) => 0,
         }
@@ -200,7 +200,11 @@ impl Sink for ZipSink {
         }
         let src = self.src.as_mut().expect("just opened");
         let f = src.by_index_raw(index).zctx(|| m.name.clone())?;
-        self.w.as_mut().expect("zip writer already closed").raw_copy_file_rename(f, m.name.clone()).zctx(|| m.name.clone())
+        self.w
+            .as_mut()
+            .expect("zip writer already closed")
+            .raw_copy_file_rename(f, m.name.clone())
+            .zctx(|| m.name.clone())
     }
 
     fn begin(&mut self, m: &EntryMeta) -> Result<()> {
@@ -236,6 +240,7 @@ impl Sink for ZipSink {
 
 // ───────────────────────── tar / tar.gz ─────────────────────────
 
+#[expect(clippy::large_enum_variant, reason = "每个输出只有一个实例，装箱没有收益")]
 enum TarOut {
     Plain(BufWriter<File>),
     Gz(GzEncoder<BufWriter<File>>),
@@ -270,7 +275,8 @@ struct Spill {
 impl Spill {
     fn write(&mut self, data: &[u8]) -> Result<()> {
         if self.file.is_none() && self.mem.len() + data.len() > self.limit {
-            let mut f = tempfile::tempfile_in(&self.dir).ctx(|| crate::t!("io.temp_create", path = self.dir.display()))?;
+            let mut f =
+                tempfile::tempfile_in(&self.dir).ctx(|| crate::t!("io.temp_create", path = self.dir.display()))?;
             f.write_all(&self.mem).ctx(|| crate::t!("io.temp_io"))?;
             self.mem = Vec::new();
             self.file = Some(f);
@@ -349,9 +355,9 @@ impl Sink for TarSink {
     }
 
     fn begin(&mut self, m: &EntryMeta) -> Result<()> {
-        let dir = self.final_path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new(".")).to_path_buf();
-        self.stream =
-            Some((m.clone(), Spill { mem: Vec::new(), file: None, len: 0, limit: self.spill_limit, dir }));
+        let dir =
+            self.final_path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new(".")).to_path_buf();
+        self.stream = Some((m.clone(), Spill { mem: Vec::new(), file: None, len: 0, limit: self.spill_limit, dir }));
         Ok(())
     }
 
@@ -372,7 +378,9 @@ impl Sink for TarSink {
                 let r = BufReader::new(f).take(spill.len);
                 self.b().append_data(&mut h, name, r).ctx(|| crate::t!("io.write", path = m.name))
             }
-            None => self.b().append_data(&mut h, name, spill.mem.as_slice()).ctx(|| crate::t!("io.write", path = m.name)),
+            None => {
+                self.b().append_data(&mut h, name, spill.mem.as_slice()).ctx(|| crate::t!("io.write", path = m.name))
+            }
         }
     }
 
@@ -423,10 +431,10 @@ impl DirSink {
     }
 
     fn set_meta(path: &Path, m: &EntryMeta) {
-        if let Some(t) = m.mtime.filter(|t| *t > 0) {
-            if let Ok(f) = File::options().write(true).open(path) {
-                let _ = f.set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(t as u64));
-            }
+        if let Some(t) = m.mtime.filter(|t| *t > 0)
+            && let Ok(f) = File::options().write(true).open(path)
+        {
+            let _ = f.set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(t as u64));
         }
         #[cfg(unix)]
         if let Some(mode) = m.mode {
@@ -499,6 +507,7 @@ impl Sink for DirSink {
 
 // ───────────────────────── 单文件 / .gz / stdout / 丢弃 ─────────────────────────
 
+#[expect(clippy::large_enum_variant, reason = "每个输出只有一个实例，装箱没有收益")]
 enum OneOut {
     Plain(BufWriter<File>),
     Gz(GzEncoder<BufWriter<File>>),
