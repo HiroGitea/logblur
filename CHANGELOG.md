@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/HiroGitea/logblur/compare/v0.1.0...v0.2.0) - 2026-10-23
+
+### Other
+
+- Translate remaining comments to English
+- compress .gz and .tar.gz output on all cores
+- stream every entry larger than one chunk
+- skip rules by required keywords and search only matching lines
+
 ## [0.1.0](https://github.com/HiroGitea/logblur/releases/tag/v0.1.0) - 2026-10-23
 
 ### Other
