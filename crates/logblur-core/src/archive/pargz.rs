@@ -1,10 +1,10 @@
-//! Parallel gzip writer in the style of pigz.
+//! Parallel deflate in the style of pigz, used for .gz / .tar.gz output and for large zip entries.
 //!
 //! The input is cut into blocks that are deflated on several threads at once. Each block is primed with the last
 //! 32 KiB of the block before it as a preset dictionary, so back-references work across blocks and the ratio is close
 //! to single-threaded compression. Non-final blocks end with a sync flush (byte-aligned, not final), so the blocks
-//! concatenate into one ordinary deflate stream, and their CRC-32s are combined into the trailer. The result is a
-//! single standard gzip member that any gzip reader accepts.
+//! concatenate into one ordinary deflate stream, and their CRC-32s are combined. [`ParGzWriter`] wraps that stream
+//! in a single standard gzip member that any gzip reader accepts.
 
 use std::collections::VecDeque;
 use std::io::{self, Write};
@@ -22,7 +22,8 @@ const HEADER: [u8; 10] = [0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 0xff];
 
 type Block = io::Result<(Vec<u8>, Hasher)>;
 
-pub struct ParGzWriter<W: Write> {
+/// Writes a raw deflate stream, compressed on several threads.
+pub struct ParDeflate<W: Write> {
     inner: W,
     level: Compression,
     threads: usize,
@@ -33,13 +34,12 @@ pub struct ParGzWriter<W: Write> {
     pending: VecDeque<JoinHandle<Block>>,
     crc: Hasher,
     len: u64,
-    header_written: bool,
 }
 
-impl<W: Write> ParGzWriter<W> {
+impl<W: Write> ParDeflate<W> {
     /// Compresses at `level` on up to `threads` threads.
-    pub fn new(inner: W, level: Compression, threads: usize) -> ParGzWriter<W> {
-        ParGzWriter {
+    pub fn new(inner: W, level: Compression, threads: usize) -> ParDeflate<W> {
+        ParDeflate {
             inner,
             level,
             threads: threads.max(1),
@@ -48,28 +48,25 @@ impl<W: Write> ParGzWriter<W> {
             pending: VecDeque::new(),
             crc: Hasher::new(),
             len: 0,
-            header_written: false,
         }
     }
 
-    /// Writes the remaining data and the trailer and returns the inner writer.
-    pub fn finish(mut self) -> io::Result<W> {
+    /// The inner writer; nothing has been written to it before the first full block.
+    pub fn get_mut(&mut self) -> &mut W {
+        &mut self.inner
+    }
+
+    /// Writes the rest of the stream and returns the inner writer, the CRC-32 and the length of the uncompressed data.
+    pub fn finish(mut self) -> io::Result<(W, u32, u64)> {
         self.submit(true)?;
         while !self.pending.is_empty() {
             self.write_oldest()?;
         }
-        self.inner.write_all(&self.crc.clone().finalize().to_le_bytes())?;
-        self.inner.write_all(&(self.len as u32).to_le_bytes())?;
-        self.inner.flush()?;
-        Ok(self.inner)
+        Ok((self.inner, self.crc.finalize(), self.len))
     }
 
     /// Starts compressing the buffered block on a new thread.
     fn submit(&mut self, last: bool) -> io::Result<()> {
-        if !self.header_written {
-            self.inner.write_all(&HEADER)?;
-            self.header_written = true;
-        }
         while self.pending.len() >= self.threads {
             self.write_oldest()?;
         }
@@ -78,7 +75,7 @@ impl<W: Write> ParGzWriter<W> {
         let level = self.level;
         self.len += data.len() as u64;
         let handle = std::thread::Builder::new()
-            .name("logblur-gzip".into())
+            .name("logblur-deflate".into())
             .spawn(move || deflate_block(level, &dict, &data, last))?;
         self.pending.push_back(handle);
         Ok(())
@@ -92,7 +89,7 @@ impl<W: Write> ParGzWriter<W> {
     }
 }
 
-impl<W: Write> Write for ParGzWriter<W> {
+impl<W: Write> Write for ParDeflate<W> {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         let n = data.len().min(BLOCK - self.buf.len());
         self.buf.extend_from_slice(&data[..n]);
@@ -105,6 +102,48 @@ impl<W: Write> Write for ParGzWriter<W> {
     /// Only flushes what has already been compressed; a partial block stays buffered so blocks keep their size.
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
+    }
+}
+
+/// Writes a gzip stream, compressed on several threads.
+pub struct ParGzWriter<W: Write> {
+    deflate: ParDeflate<W>,
+    header_written: bool,
+}
+
+impl<W: Write> ParGzWriter<W> {
+    /// Compresses at `level` on up to `threads` threads.
+    pub fn new(inner: W, level: Compression, threads: usize) -> ParGzWriter<W> {
+        ParGzWriter { deflate: ParDeflate::new(inner, level, threads), header_written: false }
+    }
+
+    fn header(&mut self) -> io::Result<()> {
+        if !self.header_written {
+            self.deflate.get_mut().write_all(&HEADER)?;
+            self.header_written = true;
+        }
+        Ok(())
+    }
+
+    /// Writes the remaining data and the trailer and returns the inner writer.
+    pub fn finish(mut self) -> io::Result<W> {
+        self.header()?;
+        let (mut inner, crc, len) = self.deflate.finish()?;
+        inner.write_all(&crc.to_le_bytes())?;
+        inner.write_all(&(len as u32).to_le_bytes())?;
+        inner.flush()?;
+        Ok(inner)
+    }
+}
+
+impl<W: Write> Write for ParGzWriter<W> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        self.header()?;
+        self.deflate.write(data)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.deflate.flush()
     }
 }
 

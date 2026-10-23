@@ -10,7 +10,7 @@ use flate2::write::GzEncoder;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
-use super::pargz::ParGzWriter;
+use super::pargz::{ParDeflate, ParGzWriter};
 use super::{EntryMeta, OutputKind, unix_to_zip_time};
 use crate::error::{Error, IoContext, Result, ZipContext};
 
@@ -42,7 +42,11 @@ pub trait Sink: Send {
     fn abort(self: Box<Self>);
 }
 
-/// Threads for compressing a .gz / .tar.gz output stream.
+/// Streamed zip entries up to this input size are deflated on all cores in memory and then copied into the archive;
+/// larger ones (or ones of unknown size) are compressed by the zip writer as they stream, keeping memory bounded.
+const PARALLEL_ZIP_MAX: u64 = 512 << 20;
+
+/// Threads for compressing a .gz / .tar.gz output stream or a large zip entry.
 fn gzip_threads() -> usize {
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1)
 }
@@ -129,6 +133,44 @@ pub fn make_zip_blob(m: &EntryMeta, data: &[u8]) -> Result<Vec<u8>> {
     Ok(w.finish().zctx(|| m.name.clone())?.into_inner())
 }
 
+/// A single-entry zip holding already-deflated data. The zip crate writes it as a stored entry, so the name, times and
+/// permissions are encoded exactly as for any other entry; then the method, version, CRC-32 and uncompressed size in
+/// the local and central headers are patched to describe the deflate stream.
+pub fn deflated_zip_blob(m: &EntryMeta, deflated: &[u8], crc: u32, size: u64) -> Result<Vec<u8>> {
+    let too_big = || Error::Other(crate::t!("pipeline.no_zip_blob", name = m.name));
+    let size = u32::try_from(size).map_err(|_| too_big())?;
+    u32::try_from(deflated.len()).map_err(|_| too_big())?;
+    let o = zip_options(m, false).compression_method(CompressionMethod::Stored).compression_level(None);
+    let mut w = ZipWriter::new(Cursor::new(Vec::with_capacity(deflated.len() + 512)));
+    w.start_file(m.name.clone(), o).zctx(|| m.name.clone())?;
+    w.write_all(deflated).ctx(|| crate::t!("io.compress", path = m.name))?;
+    let mut b = w.finish().zctx(|| m.name.clone())?.into_inner();
+
+    let u16_at = |b: &[u8], at: usize| u16::from_le_bytes([b[at], b[at + 1]]);
+    let u32_at = |b: &[u8], at: usize| u32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]]);
+    let put16 = |b: &mut [u8], at: usize, v: u16| b[at..at + 2].copy_from_slice(&v.to_le_bytes());
+    let put32 = |b: &mut [u8], at: usize, v: u32| b[at..at + 4].copy_from_slice(&v.to_le_bytes());
+    // The layout is fixed: no archive comment, no zip64, sizes in the local header (the output is seekable).
+    let eocd = b.len().checked_sub(22).ok_or_else(too_big)?;
+    let central = u32_at(&b, eocd + 16) as usize;
+    if u32_at(&b, 0) != 0x0403_4b50 || u32_at(&b, eocd) != 0x0605_4b50 || u32_at(&b, central) != 0x0201_4b50 {
+        return Err(too_big());
+    }
+    debug_assert_eq!((u16_at(&b, 8), u16_at(&b, central + 10)), (0, 0), "stored entries");
+    // Local header: version needed, method, CRC-32, uncompressed size.
+    put16(&mut b, 4, 20);
+    put16(&mut b, 8, 8);
+    put32(&mut b, 14, crc);
+    put32(&mut b, 22, size);
+    // Central header: the same fields, 2 bytes further in, and "version made by" (low byte; the high byte is the OS).
+    b[central + 4] = b[central + 4].max(20);
+    put16(&mut b, central + 6, 20);
+    put16(&mut b, central + 10, 8);
+    put32(&mut b, central + 16, crc);
+    put32(&mut b, central + 24, size);
+    Ok(b)
+}
+
 /// Gzip-compresses a chunk of data (used when writing nested .gz logs back).
 pub fn gzip(data: &[u8]) -> Result<Vec<u8>> {
     let mut e = GzEncoder::new(Vec::with_capacity(data.len() / 3 + 64), Compression::new(6));
@@ -145,6 +187,8 @@ pub struct ZipSink {
     force: bool,
     src_path: Option<PathBuf>,
     src: Option<ZipArchive<BufReader<File>>>,
+    /// The streamed entry being deflated in parallel, if any.
+    stream: Option<(EntryMeta, ParDeflate<Vec<u8>>)>,
 }
 
 impl ZipSink {
@@ -158,6 +202,7 @@ impl ZipSink {
             force,
             src_path: src_zip.map(Path::to_path_buf),
             src: None,
+            stream: None,
         })
     }
 
@@ -215,17 +260,27 @@ impl Sink for ZipSink {
     }
 
     fn begin(&mut self, m: &EntryMeta) -> Result<()> {
+        if m.size.is_some_and(|s| s <= PARALLEL_ZIP_MAX) {
+            self.stream = Some((m.clone(), ParDeflate::new(Vec::new(), Compression::new(6), gzip_threads())));
+            return Ok(());
+        }
         let large = m.size.is_none_or(|s| s.saturating_mul(3) >= 0xF000_0000);
         let o = zip_options(m, large);
         self.w().start_file(m.name.clone(), o).zctx(|| m.name.clone())
     }
 
     fn write(&mut self, data: &[u8]) -> Result<()> {
-        self.w().write_all(data).ctx(|| crate::t!("io.write_output"))
+        match &mut self.stream {
+            Some((m, d)) => d.write_all(data).ctx(|| crate::t!("io.compress", path = m.name)),
+            None => self.w().write_all(data).ctx(|| crate::t!("io.write_output")),
+        }
     }
 
     fn end(&mut self) -> Result<()> {
-        Ok(())
+        let Some((m, d)) = self.stream.take() else { return Ok(()) };
+        let (deflated, crc, size) = d.finish().ctx(|| crate::t!("io.compress", path = m.name))?;
+        let blob = deflated_zip_blob(&m, &deflated, crc, size)?;
+        self.zip_blob(&m, blob)
     }
 
     fn finish(mut self: Box<Self>) -> Result<u64> {
@@ -672,6 +727,35 @@ pub fn create_sink(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deflated_blob_matches_a_normal_entry() {
+        let mut m = EntryMeta::file("var/log/日志.log");
+        m.mode = Some(0o640);
+        m.mtime = Some(1_761_200_000);
+        let data: Vec<u8> =
+            (0..(5usize << 20) / 2).flat_map(|i| format!("line {i} 203.0.113.{}\n", i % 250).into_bytes()).collect();
+        let mut d = ParDeflate::new(Vec::new(), Compression::new(6), 4);
+        d.write_all(&data).unwrap();
+        let (deflated, crc, size) = d.finish().unwrap();
+        let blob = deflated_zip_blob(&m, &deflated, crc, size).unwrap();
+        let normal = make_zip_blob(&m, &data).unwrap();
+
+        let mut a = ZipArchive::new(Cursor::new(blob)).unwrap();
+        let mut n = ZipArchive::new(Cursor::new(normal)).unwrap();
+        let mut out = Vec::new();
+        let mut fa = a.by_index(0).unwrap();
+        fa.read_to_end(&mut out).unwrap();
+        assert_eq!(out, data);
+        let fn_ = n.by_index(0).unwrap();
+        assert_eq!(fa.name().unwrap(), fn_.name().unwrap());
+        assert_eq!(fa.compression(), CompressionMethod::Deflated);
+        assert_eq!(fa.crc32(), fn_.crc32());
+        assert_eq!(fa.size(), fn_.size());
+        assert_eq!(fa.last_modified(), fn_.last_modified());
+        assert_eq!(fa.unix_mode(), fn_.unix_mode());
+        assert_eq!(fa.version_made_by(), fn_.version_made_by());
+    }
 
     #[test]
     fn sanitize() {
