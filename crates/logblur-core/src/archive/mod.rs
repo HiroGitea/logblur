@@ -1,5 +1,6 @@
 //! Input sources and output sinks: zip, tar, tar.gz, single .gz, single file, directory, stdin/stdout.
 
+pub mod pargz;
 pub mod sink;
 
 use std::fs::{self, File};
