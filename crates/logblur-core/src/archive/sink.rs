@@ -728,6 +728,15 @@ pub fn create_sink(
 mod tests {
     use super::*;
 
+    /// Losing an auto trait on a public type is a breaking change; keep the sinks unwind-safe.
+    #[test]
+    fn sinks_keep_their_auto_traits() {
+        fn check<T: Send + std::panic::RefUnwindSafe>() {}
+        check::<ZipSink>();
+        check::<TarSink>();
+        check::<OneSink>();
+    }
+
     #[test]
     fn deflated_blob_matches_a_normal_entry() {
         let mut m = EntryMeta::file("var/log/日志.log");
