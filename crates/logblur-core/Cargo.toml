@@ -19,7 +19,7 @@ memchr = "2.7"
 encoding_rs = { version = "0.8.42", features = ["fast-legacy-encode"] }
 chardetng = "1.0"
 zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2-zlib-rs", "deflate64", "bzip2", "lzma", "xz"] }
-flate2 = { version = "1.1", default-features = false, features = ["zlib-rs"] }
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs", "runtime_detection"] }
 tar = { version = "0.4.46", default-features = false }
 crossbeam-channel.workspace = true
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }
@@ -28,6 +28,9 @@ serde_json = "1"
 toml = "1.1"
 sha2 = "0.10"
 tempfile = "3.27"
+regex-syntax = "0.8.11"
+regex-automata = "0.4.18"
+crc32fast = "1.5.3"
 
 [dev-dependencies]
 tempfile = "3.27"
