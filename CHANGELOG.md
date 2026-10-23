@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/HiroGitea/logblur/compare/v0.2.0...v0.2.1) - 2026-10-23
+
+### Fixed
+
+- keep archive sinks RefUnwindSafe ([#7](https://github.com/HiroGitea/logblur/pull/7))
+
+### Other
+
+- mention the performance work in the README ([#4](https://github.com/HiroGitea/logblur/pull/4))
+- compress large zip entries on all cores ([#6](https://github.com/HiroGitea/logblur/pull/6))
+
 ## [0.2.0](https://github.com/HiroGitea/logblur/compare/v0.1.0...v0.2.0) - 2026-10-23
 
 ### Other
