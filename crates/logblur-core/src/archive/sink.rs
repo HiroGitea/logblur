@@ -10,6 +10,7 @@ use flate2::write::GzEncoder;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
+use super::pargz::ParGzWriter;
 use super::{EntryMeta, OutputKind, unix_to_zip_time};
 use crate::error::{Error, IoContext, Result, ZipContext};
 
@@ -39,6 +40,11 @@ pub trait Sink: Send {
     fn finish(self: Box<Self>) -> Result<u64>;
     /// Gives up: deletes the unfinished output.
     fn abort(self: Box<Self>);
+}
+
+/// Threads for compressing a .gz / .tar.gz output stream.
+fn gzip_threads() -> usize {
+    std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1)
 }
 
 /// `<target>.part`
@@ -241,10 +247,9 @@ impl Sink for ZipSink {
 
 // ───────────────────────── tar / tar.gz ─────────────────────────
 
-#[expect(clippy::large_enum_variant, reason = "each output has a single instance, so boxing gains nothing")]
 enum TarOut {
     Plain(BufWriter<File>),
-    Gz(GzEncoder<BufWriter<File>>),
+    Gz(ParGzWriter<BufWriter<File>>),
 }
 
 impl Write for TarOut {
@@ -317,7 +322,8 @@ impl TarSink {
         let part = part_path(final_path);
         let f = File::create(&part).map_err(|e| Error::io_path("io.create", &part, e))?;
         let w = BufWriter::with_capacity(1 << 20, f);
-        let out = if gz { TarOut::Gz(GzEncoder::new(w, Compression::new(6))) } else { TarOut::Plain(w) };
+        let out =
+            if gz { TarOut::Gz(ParGzWriter::new(w, Compression::new(6), gzip_threads())) } else { TarOut::Plain(w) };
         let mut b = tar::Builder::new(out);
         b.follow_symlinks(false);
         Ok(TarSink {
@@ -508,10 +514,9 @@ impl Sink for DirSink {
 
 // ───────────────────────── Single file / .gz / stdout / discard ─────────────────────────
 
-#[expect(clippy::large_enum_variant, reason = "each output has a single instance, so boxing gains nothing")]
 enum OneOut {
     Plain(BufWriter<File>),
-    Gz(GzEncoder<BufWriter<File>>),
+    Gz(ParGzWriter<BufWriter<File>>),
     Stdout(BufWriter<io::Stdout>),
     Discard(u64),
 }
@@ -544,7 +549,8 @@ impl OneSink {
         let part = part_path(final_path);
         let f = File::create(&part).map_err(|e| Error::io_path("io.create", &part, e))?;
         let w = BufWriter::with_capacity(1 << 20, f);
-        let out = if gz { OneOut::Gz(GzEncoder::new(w, Compression::new(6))) } else { OneOut::Plain(w) };
+        let out =
+            if gz { OneOut::Gz(ParGzWriter::new(w, Compression::new(6), gzip_threads())) } else { OneOut::Plain(w) };
         Ok(OneSink {
             out: Some(out),
             part: Some(part),
