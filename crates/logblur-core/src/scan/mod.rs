@@ -1,17 +1,22 @@
 //! Scan engine: scans a run of UTF-8 (or mostly UTF-8) bytes rule by rule, filters the hits through the trailing
 //! boundary check, protected ranges, validators and the allow list, then merges overlapping ranges.
 //!
-//! Each rule scans the input independently (the regex crate uses literal prefixes for SIMD prefiltering), so no
-//! position is ever missed because another rule matched it first. The `Scanner` boundary stays here so the
-//! implementation can later be replaced with a GPU or multi-pattern automaton.
+//! Each rule scans the input independently, so no position is ever missed because another rule matched it first. A
+//! keyword prefilter (see `prefilter`) first finds where each rule's required literals occur in one SIMD pass, so
+//! rules are skipped when they cannot match and otherwise searched only on the lines that can hold a match. The
+//! `Scanner` boundary stays here so the implementation can later be replaced with a GPU or multi-pattern automaton.
 
+mod prefilter;
 mod resolve;
 
 use std::borrow::Cow;
 use std::collections::HashSet;
+use std::ops::Range;
 
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder, MatchKind};
-use regex::bytes::{Regex, RegexBuilder};
+use regex_automata::Input;
+use regex_automata::meta::{self, Regex};
+use regex_automata::util::syntax;
 
 use crate::category::{Category, Counts};
 use crate::config::{JobConfig, MaskMode};
@@ -22,6 +27,8 @@ use crate::rules::protect::PROTECT_PATTERNS;
 use crate::rules::table::{GENERIC_HOSTNAMES, builtin};
 use crate::rules::{Cand, FIRST_GROUP, Rule};
 use crate::util::ceil_char_boundary;
+
+use prefilter::{Plan, Prefilter};
 
 pub use resolve::resolve;
 
@@ -55,7 +62,9 @@ pub trait Scanner: Send + Sync {
 
 pub struct Engine {
     rules: Vec<Compiled>,
+    rule_filter: Prefilter,
     protect: Vec<Regex>,
+    protect_filter: Prefilter,
     need_protect: bool,
     allow: Allowlist,
     deny: Option<AhoCorasick>,
@@ -65,14 +74,22 @@ pub struct Engine {
     name_masker: Masker,
 }
 
+/// Compiles with the same semantics as `regex::bytes::Regex` (no UTF-8 requirement), multi-line and CRLF-aware.
 fn compile(pattern: &str, id: &str) -> Result<Regex> {
-    RegexBuilder::new(pattern)
-        .multi_line(true)
-        .crlf(true)
-        .size_limit(64 << 20)
-        .dfa_size_limit(32 << 20)
-        .build()
+    meta::Regex::builder()
+        .syntax(syntax::Config::new().utf8(false).multi_line(true).crlf(true))
+        .configure(meta::Config::new().utf8_empty(false).nfa_size_limit(Some(64 << 20)).hybrid_cache_capacity(32 << 20))
+        .build(pattern)
         .map_err(|e| Error::Rule { rule: id.to_string(), msg: e.to_string() })
+}
+
+/// Calls `f` with each range of a `len`-byte haystack that `plan` asks to search.
+fn for_each_range(plan: &Plan, len: usize, mut f: impl FnMut(Range<usize>)) {
+    match plan {
+        Plan::Skip => {}
+        Plan::Full => f(0..len),
+        Plan::Windows(w) => w.iter().cloned().for_each(f),
+    }
 }
 
 fn as_str(b: &[u8]) -> Cow<'_, str> {
@@ -160,6 +177,8 @@ impl Engine {
             .enumerate()
             .map(|(i, (_, p))| compile(p, &format!("protect_{i}")))
             .collect::<Result<Vec<_>>>()?;
+        let rule_filter = Prefilter::new(rules.iter().map(|c| c.rule.pattern.as_ref()));
+        let protect_filter = Prefilter::new(PROTECT_PATTERNS.iter().map(|(_, p)| *p));
         if rules.len() >= RULE_DENY as usize {
             return Err(Error::Config(crate::t!("config.too_many_rules")));
         }
@@ -169,7 +188,9 @@ impl Engine {
         let name_masker = masker.with_mode(name_mode);
         Ok(Engine {
             rules,
+            rule_filter,
             protect,
+            protect_filter,
             need_protect,
             allow,
             deny,
@@ -232,10 +253,10 @@ impl Engine {
 
     fn protect_ranges(&self, hay: &[u8]) -> Vec<(usize, usize)> {
         let mut v = Vec::new();
-        for re in &self.protect {
-            for m in re.find_iter(hay) {
-                v.push((m.start(), m.end()));
-            }
+        for (re, plan) in self.protect.iter().zip(self.protect_filter.plan(hay)) {
+            for_each_range(&plan, hay.len(), |range| {
+                v.extend(re.find_iter(Input::new(hay).range(range)).map(|m| (m.start(), m.end())));
+            });
         }
         if v.len() > 1 {
             v.sort_unstable();
@@ -251,28 +272,50 @@ impl Engine {
         v
     }
 
-    /// Runs one rule and calls `hit(start, end)` for every hit that passes the checks.
-    fn run_rule(&self, c: &Compiled, hay: &[u8], protect: &[(usize, usize)], hit: &mut dyn FnMut(usize, usize)) {
-        let mut locs = c.re.capture_locations();
-        let mut pos = 0usize;
-        while pos <= hay.len() {
-            let Some(m) = c.re.captures_read_at(&mut locs, hay, pos) else { break };
+    /// Runs one rule over the ranges given by its plan and calls `hit(start, end)` for every hit that passes the
+    /// checks.
+    fn run_rule(
+        &self,
+        c: &Compiled,
+        hay: &[u8],
+        plan: &Plan,
+        protect: &[(usize, usize)],
+        hit: &mut dyn FnMut(usize, usize),
+    ) {
+        for_each_range(plan, hay.len(), |range| self.run_rule_in(c, hay, range, protect, hit));
+    }
+
+    /// Searches `range` of `hay`; look-around assertions still see the bytes outside it.
+    fn run_rule_in(
+        &self,
+        c: &Compiled,
+        hay: &[u8],
+        range: Range<usize>,
+        protect: &[(usize, usize)],
+        hit: &mut dyn FnMut(usize, usize),
+    ) {
+        let mut caps = c.re.create_captures();
+        let end = range.end;
+        let mut pos = range.start;
+        while pos <= end {
+            c.re.search_captures(&Input::new(hay).range(pos..end), &mut caps);
+            let Some(m) = caps.get_match() else { break };
             let (ms, me) = (m.start(), m.end());
             let span = if c.rule.group == FIRST_GROUP {
-                (1..locs.len()).find_map(|g| locs.get(g))
+                (1..caps.group_len()).find_map(|g| caps.get_group(g))
             } else {
-                locs.get(c.rule.group)
+                caps.get_group(c.rule.group)
             };
             let mut next = ms + 1;
-            if let Some((ps, pe)) = span
-                && pe > ps
-                && self.accept(&c.rule, hay, ms, me, ps, pe, protect)
+            if let Some(sp) = span
+                && sp.end > sp.start
+                && self.accept(&c.rule, hay, ms, me, sp.start, sp.end, protect)
             {
-                hit(ps, pe);
-                next = next.max(pe);
+                hit(sp.start, sp.end);
+                next = next.max(sp.end);
             }
             pos = ceil_char_boundary(hay, next);
-            if pos > hay.len() || (pos == hay.len() && ms == hay.len()) {
+            if pos > end || (pos == end && ms == end) {
                 break;
             }
         }
@@ -327,9 +370,10 @@ impl Engine {
     pub fn find(&self, hay: &[u8], out: &mut Vec<Found>) {
         out.clear();
         let protect = if self.need_protect { self.protect_ranges(hay) } else { Vec::new() };
-        for (ri, c) in self.rules.iter().enumerate() {
+        let plans = self.rule_filter.plan(hay);
+        for (ri, (c, plan)) in self.rules.iter().zip(&plans).enumerate() {
             let cat = c.rule.category;
-            self.run_rule(c, hay, &protect, &mut |s, e| {
+            self.run_rule(c, hay, plan, &protect, &mut |s, e| {
                 out.push(Found { start: s, end: e, category: cat, rule: ri as u16 });
             });
         }
@@ -386,9 +430,10 @@ impl Engine {
 
     /// Runs only the "learning" rules and collects the values.
     pub fn learn(&self, hay: &[u8], out: &mut HashSet<(Category, String)>) {
-        for c in self.rules.iter().filter(|c| c.rule.learn) {
+        let plans = self.rule_filter.plan(hay);
+        for (c, plan) in self.rules.iter().zip(&plans).filter(|(c, _)| c.rule.learn) {
             let cat = c.rule.category;
-            self.run_rule(c, hay, &[], &mut |s, e| {
+            self.run_rule(c, hay, plan, &[], &mut |s, e| {
                 let v = as_str(&hay[s..e]).trim_matches(|ch: char| ch == '\'' || ch == '"').to_string();
                 if !v.is_empty() && v.len() <= 253 {
                     out.insert((cat, v));
