@@ -6,8 +6,8 @@
 //!        └──── directories, links, verbatim copies, heads of streamed entries ─────┘
 //! ```
 //!
-//! - Small entries are read whole into memory and handed to one worker; large entries are cut into chunks along lines,
-//!   processed by several workers in parallel and concatenated in order by the writer.
+//! - Entries up to one chunk are read whole into memory and handed to one worker; larger entries are cut into chunks
+//!   along lines, processed by several workers in parallel and concatenated in order by the writer.
 //! - The reader acquires memory from the [`Budget`] before sending data and the writer releases it once written, so
 //!   in-flight data never exceeds the budget.
 //! - Plaintext only lives in memory; only scrubbed data is written to disk.
@@ -86,8 +86,8 @@ pub fn plan(cfg: &JobConfig, sequential: bool) -> Plan {
     let workers = if sequential { 1 } else { cfg.threads.unwrap_or(cores).clamp(1, 256) };
     let chunk = cfg.chunk_size.clamp(64, 64 << 20);
     let budget = memory_budget(cfg.memory).max(chunk as u64 * FACTOR * 4);
-    let auto_whole = (budget / (workers as u64 * 2 * FACTOR)).clamp(256 << 10, 16 << 20) as usize;
-    let whole_max = cfg.whole_max.unwrap_or(auto_whole.max(chunk));
+    // Entries larger than one chunk are streamed in chunks so that a few big files still keep every worker busy.
+    let whole_max = cfg.whole_max.unwrap_or(chunk);
     Plan { workers, budget, chunk, whole_max, inline: sequential }
 }
 

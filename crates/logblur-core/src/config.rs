@@ -209,8 +209,7 @@ pub struct JobConfig {
     pub output_encoding: OutputEncoding,
     /// Chunk size for streaming (bytes).
     pub chunk_size: usize,
-    /// Entries larger than this are processed as streamed chunks; `None` decides automatically from the memory budget
-    /// (for tests).
+    /// Entries larger than this are processed as streamed chunks; `None` uses `chunk_size` (for tests).
     #[doc(hidden)]
     pub whole_max: Option<usize>,
 }
