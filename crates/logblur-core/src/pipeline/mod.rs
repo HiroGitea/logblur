@@ -1,14 +1,16 @@
-//! 并发流水线：
+//! Concurrent pipeline:
 //!
 //! ```text
-//! 读线程（按归档顺序） ──Job──▶ N 个工作线程（解码/扫描/打码/压缩） ──Piece──▶ 写线程（按序写出）
-//!        │                                                              ▲
-//!        └──── 目录、链接、原样复制、流式条目的开头 ─────────────────────┘
+//! reader (archive order) ──Job──▶ N workers (decode/scan/mask/compress) ──Piece──▶ writer (in order)
+//!        │                                                                         ▲
+//!        └──── directories, links, verbatim copies, heads of streamed entries ─────┘
 //! ```
 //!
-//! - 小条目整体读入内存交给一个工作线程；大条目按行切块，多个工作线程并行处理，写线程按序拼接。
-//! - 读线程在送出数据前向 [`Budget`] 申请内存，写线程写完后释放，在途数据永远不超过预算。
-//! - 明文只在内存里；写到磁盘的只有清洗后的数据。
+//! - Small entries are read whole into memory and handed to one worker; large entries are cut into chunks along lines,
+//!   processed by several workers in parallel and concatenated in order by the writer.
+//! - The reader acquires memory from the [`Budget`] before sending data and the writer releases it once written, so
+//!   in-flight data never exceeds the budget.
+//! - Plaintext only lives in memory; only scrubbed data is written to disk.
 
 mod budget;
 mod chunker;
@@ -38,23 +40,24 @@ use crate::report::{EntryReport, EntryStatus};
 use crate::scan::Engine;
 use crate::text::{self, SAMPLE_LEN, StreamDecoder, TextKind};
 
-/// 一个字节的输入在处理中大约要占几份内存（原文 + 解码/输出 + 压缩）。
+/// Roughly how many copies of memory one byte of input occupies while being processed (original + decoded/output +
+/// compressed).
 const FACTOR: u64 = 3;
 const READ_BLOCK: usize = 256 * 1024;
 
-/// 资源规划。
+/// Resource plan.
 #[derive(Debug, Clone)]
 pub struct Plan {
     pub workers: usize,
     pub budget: u64,
     pub chunk: usize,
-    /// 不超过这个大小的条目整体处理，否则流式分块。
+    /// Entries no larger than this are processed whole; larger ones are streamed in chunks.
     pub whole_max: usize,
-    /// 在读线程里顺序处理（计数伪名需要确定的编号顺序）。
+    /// Process sequentially on the reader thread (counter pseudonyms need a deterministic numbering order).
     pub inline: bool,
 }
 
-/// 可用内存 × 比例，并受 cgroup 限制。
+/// Available memory × ratio, also capped by the cgroup limit.
 pub fn memory_budget(limit: MemoryLimit) -> u64 {
     let mut sys = sysinfo::System::new();
     sys.refresh_memory();
@@ -88,7 +91,7 @@ pub fn plan(cfg: &JobConfig, sequential: bool) -> Plan {
     Plan { workers, budget, chunk, whole_max, inline: sequential }
 }
 
-/// 流水线共享状态。
+/// Shared pipeline state.
 pub struct Ctx<'a> {
     pub cfg: &'a JobConfig,
     pub engine: &'a Engine,
@@ -150,7 +153,7 @@ impl<'a> Ctx<'a> {
         self.failed.store(true, Ordering::Relaxed);
     }
 
-    /// 结束时的错误：先报真正的错误，其次是取消。
+    /// Error to report at the end: a real error takes precedence, then cancellation.
     pub fn outcome(&self) -> Result<()> {
         if let Some(e) = self.error.lock().unwrap_or_else(|p| p.into_inner()).take() {
             return Err(e);
@@ -186,7 +189,7 @@ impl<'a> Ctx<'a> {
         self.budget.acquire(n, &|| self.stop()).ok_or(Error::Cancelled)
     }
 
-    /// 把已持有的 `have` 调整为 `need`。
+    /// Adjusts the currently held `have` bytes to `need`.
     fn adjust(&self, have: u64, need: u64) -> Result<u64> {
         if need > have {
             let got = self.acquire(need - have)?;
@@ -279,7 +282,7 @@ fn is_nested_gz_name(name: &str) -> bool {
     l.ends_with(".gz") && !l.ends_with(".tar.gz")
 }
 
-/// 解压一段 gzip 前缀（可能被截断），只用于判断内容类型。
+/// Decompresses a (possibly truncated) gzip prefix; only used to sniff the content type.
 fn gunzip_prefix(head: &[u8]) -> Vec<u8> {
     let mut d = GzDecoder::new(head);
     let mut out = Vec::new();
@@ -566,7 +569,7 @@ fn stream_entry(
 
 // ───────────────────────── 工作线程 ─────────────────────────
 
-/// 清洗一段 UTF-8 / 解码后的文本，按需要编码回原编码。
+/// Scrubs a chunk of UTF-8 / decoded text and encodes it back to the original encoding if needed.
 fn scrub_text(ctx: &Ctx, data: &[u8], kind: TextKind, mask: char, counts: &mut Counts) -> (Vec<u8>, Option<String>) {
     let engine = ctx.engine;
     match kind {
@@ -829,7 +832,7 @@ fn learn_collector(ctx: &Ctx, rx: Receiver<Piece>) -> HashSet<(Category, String)
 
 // ───────────────────────── 入口 ─────────────────────────
 
-/// 第二遍：清洗并写出。返回条目报告和输出端（由调用者 finish / abort）。
+/// Second pass: scrubs and writes output. Returns the entry reports and the sink (the caller calls finish / abort).
 pub fn scrub_pass(
     ctx: &Ctx,
     src: &mut dyn Source,
@@ -862,7 +865,7 @@ pub fn scrub_pass(
     (ctx.outcome(), sink, entries)
 }
 
-/// 第一遍：只收集用户名、主机名等「学习」值。
+/// First pass: only collects "learned" values such as usernames and hostnames.
 pub fn learn_pass(ctx: &Ctx, src: &mut dyn Source) -> Result<HashSet<(Category, String)>> {
     let (job_tx, job_rx) = bounded::<Job>(ctx.plan.workers * 2);
     let (out_tx, out_rx) = unbounded::<Piece>();

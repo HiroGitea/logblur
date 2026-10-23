@@ -1,4 +1,4 @@
-//! 清洗报告。只包含统计信息，绝不包含原始值或伪名映射表。
+//! Scrub report. Contains only statistics, never original values or the pseudonym mapping.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -13,15 +13,15 @@ use crate::util::human_bytes;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EntryStatus {
-    /// 文本，已清洗。
+    /// Text, scrubbed.
     Scrubbed,
-    /// 二进制，原样复制（未清洗）。
+    /// Binary, copied verbatim (not scrubbed).
     Binary,
-    /// 加密条目，原样复制（未清洗）。
+    /// Encrypted entry, copied verbatim (not scrubbed).
     Encrypted,
-    /// 按配置从输出中删除。
+    /// Removed from the output per configuration.
     Dropped,
-    /// 跳过（特殊文件等）。
+    /// Skipped (special files, etc.).
     Skipped,
     Dir,
     Link,
@@ -40,7 +40,7 @@ impl EntryStatus {
         }
     }
 
-    /// 界面上显示的名称（按当前语言）。
+    /// Display name in the UI (in the current language).
     pub fn label(self) -> String {
         crate::i18n::tr(&format!("status.{}", self.id()))
     }
@@ -48,7 +48,7 @@ impl EntryStatus {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EntryReport {
-    /// 清洗后的名字。
+    /// Scrubbed name.
     pub name: String,
     pub status: EntryStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -95,7 +95,7 @@ pub struct Report {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub salt_fingerprint: Option<String>,
     pub learn: bool,
-    /// 每个类别学到的标识数量（不含值）。
+    /// Number of identifiers learned per category (values not included).
     pub learned: BTreeMap<String, usize>,
     pub entries_total: usize,
     pub text_entries: usize,
@@ -237,7 +237,7 @@ impl Report {
     }
 }
 
-/// 报告文件的默认路径：`<输出>.report.json` / `.report.md`。
+/// Default path of the report file: `<output>.report.json` / `.report.md`.
 pub fn default_report_path(output: &Path, fmt: ReportFormat) -> std::path::PathBuf {
     let mut s = output.as_os_str().to_os_string();
     s.push(match fmt {

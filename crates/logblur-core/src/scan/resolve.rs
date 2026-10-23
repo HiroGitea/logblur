@@ -1,9 +1,9 @@
-//! 重叠命中的合并：重叠区间取并集（绝不少打码），类别取其中最长的那个命中
-//!（等长时取优先级高者），这样 URL 里的主机名会合并成一个 `[URL]`。
+//! Merging of overlapping hits: overlapping ranges are unioned (never masking less), and the category is taken from
+//! the longest of the hits (the higher-priority one on ties), so a hostname inside a URL merges into a single `[URL]`.
 
 use super::Found;
 
-/// `prio`：数值越小优先级越高。
+/// `prio`: a lower value means higher priority.
 pub fn resolve(found: &mut Vec<Found>, prio: impl Fn(&Found) -> u32) {
     if found.len() <= 1 {
         return;

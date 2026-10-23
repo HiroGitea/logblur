@@ -1,32 +1,32 @@
-//! 文本层：二进制判定、编码检测、解码与回编码。
+//! Text layer: binary detection, encoding detection, decoding and re-encoding.
 //!
-//! 策略：
-//! - UTF-8（含少量非法字节）直接按字节扫描，零拷贝。
-//! - UTF-16、GBK/GB18030、Big5、Shift_JIS、EUC-KR 等先解码成 UTF-8 再扫描，打码后按原编码写回，
-//!   避免 ASCII 范围的尾字节被误当成 `@`、字母参与匹配。
-//! - 无法解码或明显是二进制的内容不做清洗。
+//! Strategy:
+//! - UTF-8 (including a few invalid bytes) is scanned directly as bytes, zero-copy.
+//! - UTF-16, GBK/GB18030, Big5, Shift_JIS, EUC-KR, etc. are decoded to UTF-8 before scanning and written back in the
+//!   original encoding after masking, so trail bytes in the ASCII range are not mistaken for `@` or letters in matches.
+//! - Content that cannot be decoded or is clearly binary is not scrubbed.
 
 use encoding_rs::Encoding;
 
-/// 用于判定编码的样本大小。
+/// Size of the sample used to detect the encoding.
 pub const SAMPLE_LEN: usize = 64 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryKind {
-    /// 含 NUL 字节。
+    /// Contains NUL bytes.
     Nul,
-    /// 控制字符过多。
+    /// Too many control characters.
     Control,
-    /// 已知文件格式的魔数（值是翻译键 `binary.kind.*` 的后缀）。
+    /// Magic bytes of a known file format (the value is the suffix of the translation key `binary.kind.*`).
     Magic(&'static str),
-    /// systemd journal 二进制文件。
+    /// systemd journal binary file.
     Journal,
-    /// wtmp / btmp / lastlog 登录记录。
+    /// wtmp / btmp / lastlog login records.
     LoginRecords,
 }
 
 impl BinaryKind {
-    /// 说明文字（按当前语言）。
+    /// Description text (in the current language).
     pub fn describe(self) -> String {
         match self {
             BinaryKind::Nul => crate::t!("binary.nul"),
@@ -37,7 +37,7 @@ impl BinaryKind {
         }
     }
 
-    /// 是否是需要特别提醒的、肯定含隐私的二进制。
+    /// Whether this is a binary that certainly contains private data and deserves a special warning.
     pub fn is_sensitive(self) -> bool {
         matches!(self, BinaryKind::Journal | BinaryKind::LoginRecords | BinaryKind::Magic("nested_archive"))
     }
@@ -46,11 +46,12 @@ impl BinaryKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextKind {
     Binary(BinaryKind),
-    /// UTF-8（可能夹杂少量非法字节），直接扫描原始字节。
+    /// UTF-8 (possibly with a few invalid bytes); the raw bytes are scanned directly.
     Utf8 {
         bom: bool,
     },
-    /// 需要解码的编码。`bom_len` 是要跳过（并在输出时原样写回）的 BOM 字节数。
+    /// An encoding that needs decoding. `bom_len` is the number of BOM bytes to skip (and write back verbatim on
+    /// output).
     Legacy {
         enc: &'static Encoding,
         bom_len: usize,
@@ -159,7 +160,8 @@ fn is_cjk_multibyte(enc: &'static Encoding) -> bool {
         || enc == encoding_rs::ISO_2022_JP
 }
 
-/// 判定一段内容是二进制还是文本、用什么编码。`complete` 表示 `sample` 是否就是全部内容。
+/// Determines whether content is binary or text, and which encoding it uses. `complete` says whether `sample` is the
+/// entire content.
 pub fn detect(sample: &[u8], name: &str, complete: bool) -> TextKind {
     if let Some(b) = magic(sample, name) {
         return TextKind::Binary(b);
@@ -206,7 +208,8 @@ pub fn detect(sample: &[u8], name: &str, complete: bool) -> TextKind {
     TextKind::Legacy { enc: guess, bom_len: 0 }
 }
 
-/// 预览用：把（可能被 gzip 压缩的）开头一段内容解码成 UTF-8 文本；二进制返回 `None`。
+/// For previews: decodes the (possibly gzip-compressed) leading part of the content into UTF-8 text; returns `None`
+/// for binary content.
 pub fn decode_for_preview(name: &str, head: &[u8]) -> Option<String> {
     let lower = name.to_ascii_lowercase();
     let mut data = std::borrow::Cow::Borrowed(head);
@@ -225,12 +228,13 @@ pub fn decode_for_preview(name: &str, head: &[u8]) -> Option<String> {
     }
 }
 
-/// 不带替换地解码；有非法序列时返回 `None`。
+/// Decodes without replacement; returns `None` on invalid sequences.
 pub fn decode_strict(data: &[u8], enc: &'static Encoding) -> Option<String> {
     enc.decode_without_bom_handling_and_without_replacement(data).map(|c| c.into_owned())
 }
 
-/// 把 UTF-8 文本编码回 `enc`。UTF-16 由 encoding_rs 规范输出 UTF-8，这里手工处理。
+/// Encodes UTF-8 text back into `enc`. Per the spec, encoding_rs outputs UTF-8 for UTF-16, so UTF-16 is handled by
+/// hand here.
 pub fn encode(text: &str, enc: &'static Encoding) -> Vec<u8> {
     if enc == encoding_rs::UTF_16LE {
         return text.encode_utf16().flat_map(u16::to_le_bytes).collect();
@@ -242,7 +246,7 @@ pub fn encode(text: &str, enc: &'static Encoding) -> Vec<u8> {
     bytes.into_owned()
 }
 
-/// 打码字符在目标编码里能否表示；不能则用后备字符。
+/// Returns the mask character if the target encoding can represent it, otherwise the fallback character.
 pub fn mask_char_for(kind: TextKind, want: char, fallback: char, utf8_output: bool) -> char {
     match kind {
         TextKind::Legacy { enc, .. } if !utf8_output => {
@@ -257,7 +261,7 @@ pub fn mask_char_for(kind: TextKind, want: char, fallback: char, utf8_output: bo
     }
 }
 
-/// 流式增量解码器（非 UTF-8 的大文件）。
+/// Streaming incremental decoder (for large non-UTF-8 files).
 pub struct StreamDecoder {
     dec: encoding_rs::Decoder,
     pub had_errors: bool,
@@ -268,7 +272,7 @@ impl StreamDecoder {
         StreamDecoder { dec: enc.new_decoder_without_bom_handling(), had_errors: false }
     }
 
-    /// 解码 `src` 追加到 `dst`（UTF-8 字节）。
+    /// Decodes `src` and appends it to `dst` (as UTF-8 bytes).
     pub fn push(&mut self, src: &[u8], dst: &mut Vec<u8>, last: bool) {
         let mut s = String::new();
         let mut input = src;

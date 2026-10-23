@@ -1,5 +1,5 @@
-//! 内存预算：在途（已读入、尚未写出）的字节数不超过上限。
-//! 读线程按条目顺序申请，写线程按顺序释放，所以不会死锁。
+//! Memory budget: keeps the number of in-flight bytes (read but not yet written) under a limit.
+//! The reader acquires in entry order and the writer releases in order, so it cannot deadlock.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Condvar, Mutex};
@@ -21,7 +21,7 @@ impl Budget {
         self.total
     }
 
-    /// 申请 `n` 字节（超过总量时按总量算）。`stop()` 为真时放弃并返回 `None`。
+    /// Acquires `n` bytes (capped at the total). Gives up and returns `None` when `stop()` is true.
     pub fn acquire(&self, n: u64, stop: &dyn Fn() -> bool) -> Option<u64> {
         let n = n.min(self.total);
         if n == 0 {

@@ -1,8 +1,8 @@
-//! 小工具：大小解析、HMAC、base32、随机盐、日期换算。
+//! Small utilities: size parsing, HMAC, base32, random salt, date conversion.
 
 use sha2::{Digest, Sha256};
 
-/// 解析 `2G`、`512M`、`1.5GiB`、`1048576`。单位按 1024 进制。
+/// Parses `2G`, `512M`, `1.5GiB`, `1048576`. Units are powers of 1024.
 pub fn parse_size(s: &str) -> Option<u64> {
     let t = s.trim();
     let split = t.find(|c: char| !(c.is_ascii_digit() || c == '.')).unwrap_or(t.len());
@@ -22,7 +22,7 @@ pub fn parse_size(s: &str) -> Option<u64> {
     Some((value * mult as f64) as u64)
 }
 
-/// 人类可读的字节数。
+/// Human-readable byte count.
 pub fn human_bytes(b: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
     let mut v = b as f64;
@@ -38,7 +38,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     Sha256::digest(data).into()
 }
 
-/// HMAC-SHA256（RFC 2104）。
+/// HMAC-SHA256 (RFC 2104).
 pub fn hmac_sha256(key: &[u8], parts: &[&[u8]]) -> [u8; 32] {
     const BLOCK: usize = 64;
     let mut k = [0u8; BLOCK];
@@ -65,7 +65,7 @@ pub fn hmac_sha256(key: &[u8], parts: &[&[u8]]) -> [u8; 32] {
     outer.finalize().into()
 }
 
-/// 小写 RFC 4648 base32（无填充）。
+/// Lowercase RFC 4648 base32 (no padding).
 pub fn base32_lower(data: &[u8]) -> String {
     const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
     let mut out = String::with_capacity(data.len() * 8 / 5 + 1);
@@ -95,7 +95,8 @@ pub fn hex_lower(data: &[u8]) -> String {
     s
 }
 
-/// 生成 32 字节随机盐。`RandomState` 的种子来自操作系统随机源，再混入时间与进程号。
+/// Generates a 32-byte random salt. `RandomState` is seeded from the OS random source; time and process id are mixed
+/// in as well.
 pub fn random_salt() -> Vec<u8> {
     use std::collections::hash_map::RandomState;
     use std::hash::{BuildHasher, Hasher};
@@ -111,7 +112,7 @@ pub fn random_salt() -> Vec<u8> {
     sha256(&seed).to_vec()
 }
 
-/// 下一个 UTF-8 字符边界（`pos` 已经是边界时原样返回）。
+/// Next UTF-8 character boundary (returns `pos` unchanged if it already is one).
 #[inline]
 pub fn ceil_char_boundary(bytes: &[u8], mut pos: usize) -> usize {
     while pos < bytes.len() && (bytes[pos] & 0xC0) == 0x80 {
@@ -120,7 +121,7 @@ pub fn ceil_char_boundary(bytes: &[u8], mut pos: usize) -> usize {
     pos.min(bytes.len())
 }
 
-/// 不超过 `pos` 的最近 UTF-8 字符边界。
+/// Nearest UTF-8 character boundary not after `pos`.
 #[inline]
 pub fn floor_char_boundary(bytes: &[u8], mut pos: usize) -> usize {
     if pos >= bytes.len() {
@@ -132,7 +133,7 @@ pub fn floor_char_boundary(bytes: &[u8], mut pos: usize) -> usize {
     pos
 }
 
-/// Unix 秒 → (年, 月, 日, 时, 分, 秒)，UTC。
+/// Unix seconds → (year, month, day, hour, minute, second), UTC.
 pub fn civil_from_unix(secs: i64) -> (i32, u8, u8, u8, u8, u8) {
     let days = secs.div_euclid(86_400);
     let rem = secs.rem_euclid(86_400);
@@ -151,7 +152,7 @@ pub fn civil_from_unix(secs: i64) -> (i32, u8, u8, u8, u8, u8) {
     (y as i32, mo, d, h, m, s)
 }
 
-/// (年, 月, 日, 时, 分, 秒) → Unix 秒，UTC。
+/// (year, month, day, hour, minute, second) → Unix seconds, UTC.
 pub fn unix_from_civil(y: i32, mo: u8, d: u8, h: u8, mi: u8, s: u8) -> i64 {
     let y = if mo <= 2 { y as i64 - 1 } else { y as i64 };
     let era = y.div_euclid(400);

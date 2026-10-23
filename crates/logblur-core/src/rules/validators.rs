@@ -1,4 +1,4 @@
-//! 校验函数与尾部边界检查。
+//! Validators and trailing boundary checks.
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
@@ -16,17 +16,18 @@ fn second(rest: &[u8]) -> Option<u8> {
     rest.get(1).copied()
 }
 
-/// 后面不是字母数字。
+/// Not followed by an alphanumeric character.
 pub fn after_not_alnum(rest: &[u8]) -> bool {
     !matches!(first(rest), Some(b) if b.is_ascii_alphanumeric())
 }
 
-/// 后面不是字母数字下划线。
+/// Not followed by an alphanumeric character or underscore.
 pub fn after_not_word(rest: &[u8]) -> bool {
     !matches!(first(rest), Some(b) if b.is_ascii_alphanumeric() || b == b'_')
 }
 
-/// 数字类目标：后面不是字母数字，也不是紧跟数字的 `.` / `-`（避免截断更长的数字串）。
+/// Numeric targets: not followed by an alphanumeric character, nor by a `.` / `-` / `,` immediately followed by a
+/// digit (avoids cutting off a longer digit string).
 pub fn after_number(rest: &[u8]) -> bool {
     match first(rest) {
         Some(b) if b.is_ascii_alphanumeric() => false,
@@ -35,7 +36,8 @@ pub fn after_number(rest: &[u8]) -> bool {
     }
 }
 
-/// IPv4：后面不是字母数字，不是 `.数字`（如 1.2.3.4.5 版本号）。
+/// IPv4: not followed by an alphanumeric character or `_`, nor by `.` + an alphanumeric character (as in a version
+/// number like 1.2.3.4.5 or a host name like 1.2.3.4.example).
 pub fn after_ipv4(rest: &[u8]) -> bool {
     match first(rest) {
         Some(b) if b.is_ascii_alphanumeric() || b == b'_' => false,
@@ -44,7 +46,8 @@ pub fn after_ipv4(rest: &[u8]) -> bool {
     }
 }
 
-/// IPv6：后面不是十六进制字母数字或 `:`+十六进制。
+/// IPv6: not followed by an alphanumeric character or `_`, nor by `:` + hex or `:` (a longer address), nor by
+/// `.` + digit (an embedded IPv4 tail).
 pub fn after_ipv6(rest: &[u8]) -> bool {
     match first(rest) {
         Some(b) if b.is_ascii_alphanumeric() || b == b'_' => false,
@@ -54,7 +57,7 @@ pub fn after_ipv6(rest: &[u8]) -> bool {
     }
 }
 
-/// MAC：后面不是十六进制或 `:`/`-` + 十六进制（更长的 EUI 序列）。
+/// MAC: not followed by hex, nor by `:`/`-` + hex (a longer EUI sequence).
 pub fn after_mac(rest: &[u8]) -> bool {
     match first(rest) {
         Some(b) if b.is_ascii_alphanumeric() => false,
@@ -63,7 +66,7 @@ pub fn after_mac(rest: &[u8]) -> bool {
     }
 }
 
-/// 主机名：后面不是标签字符，也不是 `.`+字母数字。
+/// Hostname: not followed by a label character, nor by `.` + alphanumeric.
 pub fn after_host(rest: &[u8]) -> bool {
     match first(rest) {
         Some(b) if b.is_ascii_alphanumeric() || b == b'_' || b == b'-' => false,
@@ -72,7 +75,7 @@ pub fn after_host(rest: &[u8]) -> bool {
     }
 }
 
-/// 邮箱：同主机名。
+/// Email: same as hostname.
 pub fn after_email(rest: &[u8]) -> bool {
     after_host(rest)
 }
@@ -145,7 +148,7 @@ fn is_placeholder(v: &str) -> bool {
         || t.starts_with('<') && t.ends_with('>')
 }
 
-/// 口令/密钥值：排除占位符、模板变量、sudo 的 `PWD=/path`。
+/// Password/secret value: excludes placeholders, template variables and sudo's `PWD=/path`.
 pub fn secret_value(c: &Cand) -> bool {
     if is_placeholder(c.payload) {
         return false;
@@ -157,7 +160,7 @@ pub fn secret_value(c: &Cand) -> bool {
     true
 }
 
-/// 令牌：至少 8 个字符且不是占位符。
+/// Token: at least 8 characters and not a placeholder.
 pub fn token_value(c: &Cand) -> bool {
     c.payload.chars().count() >= 8 && !is_placeholder(c.payload)
 }
@@ -188,7 +191,7 @@ pub fn luhn(d: &[u8]) -> bool {
     sum.is_multiple_of(10)
 }
 
-/// 分隔符要么没有，要么全部相同。
+/// Separators are either absent or all identical.
 fn consistent_separators(s: &str) -> bool {
     let mut sep: Option<char> = None;
     for ch in s.chars().filter(|c| !c.is_ascii_digit()) {
@@ -201,7 +204,7 @@ fn consistent_separators(s: &str) -> bool {
     true
 }
 
-/// 银行卡：13–19 位、Luhn 校验、分隔符一致、不全是同一个数字。
+/// Bank card: 13–19 digits, passes Luhn, consistent separators, not all the same digit.
 pub fn bank_card(c: &Cand) -> bool {
     let d = digits(c.payload);
     if !(13..=19).contains(&d.len()) || !consistent_separators(c.payload) {
@@ -213,13 +216,13 @@ pub fn bank_card(c: &Cand) -> bool {
     luhn(&d)
 }
 
-/// 有关键词上下文的卡号/账号：12–19 位即可（部分国内借记卡不满足 Luhn）。
+/// Card/account number with keyword context: 12–19 digits suffice (some Chinese debit cards fail Luhn).
 pub fn account_number(c: &Cand) -> bool {
     let n = digits(c.payload).len();
     (12..=19).contains(&n)
 }
 
-/// 中国居民身份证 18 位校验码（GB 11643-1999）。
+/// Check digit of the 18-digit Chinese resident ID number (GB 11643-1999).
 pub fn cn_id(c: &Cand) -> bool {
     let b = c.payload.as_bytes();
     if b.len() != 18 {
@@ -237,7 +240,7 @@ pub fn cn_id(c: &Cand) -> bool {
     CHECK[(sum % 11) as usize] == b[17].to_ascii_uppercase()
 }
 
-/// 美国 SSN：区号不为 000/666/9xx，组号不为 00，序号不为 0000。
+/// US SSN: area is not 000/666/9xx, group is not 00, serial is not 0000.
 pub fn ssn(c: &Cand) -> bool {
     let p: Vec<&str> = c.payload.split('-').collect();
     if p.len() != 3 {
@@ -247,7 +250,7 @@ pub fn ssn(c: &Cand) -> bool {
     !(area == "000" || area == "666" || area.starts_with('9') || p[1] == "00" || p[2] == "0000")
 }
 
-/// IBAN mod-97 校验。
+/// IBAN mod-97 check.
 pub fn iban(c: &Cand) -> bool {
     let s: Vec<u8> = c.payload.bytes().filter(|b| !b.is_ascii_whitespace()).collect();
     if !(15..=34).contains(&s.len()) {
@@ -284,13 +287,13 @@ pub fn ipv6(c: &Cand) -> bool {
     }
 }
 
-/// MAC：分隔符一致。
+/// MAC: consistent separators.
 pub fn mac(c: &Cand) -> bool {
     let seps: Vec<u8> = c.payload.bytes().filter(|b| !b.is_ascii_hexdigit()).collect();
     seps.windows(2).all(|w| w[0] == w[1])
 }
 
-/// 常见文件扩展名与 systemd 单元后缀：不能当作顶级域名。
+/// Common file extensions and systemd unit suffixes: must not be treated as top-level domains.
 pub const FILE_LIKE_SUFFIXES: &[&str] = &[
     "log",
     "txt",
@@ -477,7 +480,7 @@ fn tld_of(host: &str) -> &str {
     host.rsplit('.').next().unwrap_or("")
 }
 
-/// 邮箱：域名的最后一段不能是文件扩展名或 systemd 单元后缀（如 user@1000.service）。
+/// Email: the last label of the domain must not be a file extension or systemd unit suffix (e.g. user@1000.service).
 pub fn email(c: &Cand) -> bool {
     let Some((local, domain)) = c.payload.rsplit_once('@') else {
         return false;
@@ -492,7 +495,7 @@ pub fn email(c: &Cand) -> bool {
     domain.split('.').all(|l| !l.is_empty() && !l.starts_with('-') && !l.ends_with('-') && l.len() <= 63)
 }
 
-/// 主机名：不是路径的一部分，不是文件名，标签合法。
+/// Hostname: not part of a path, not a file name, valid labels.
 pub fn hostname(c: &Cand) -> bool {
     if matches!(c.before.last(), Some(b'/' | b'\\' | b'@' | b'.' | b'$' | b'%')) {
         return false;
@@ -513,7 +516,7 @@ pub fn hostname(c: &Cand) -> bool {
     labels[..labels.len() - 1].iter().any(|l| l.bytes().any(|b| b.is_ascii_alphabetic()))
 }
 
-/// 用户名：不是纯数字（uid），不是占位符，长度合理。
+/// Username: not purely numeric (a uid), not a placeholder, reasonable length.
 pub fn username(c: &Cand) -> bool {
     let u = c.payload.trim_matches(|ch: char| ch == '\'' || ch == '"');
     if u.is_empty() || u.len() > 64 || u.bytes().all(|b| b.is_ascii_digit()) {
@@ -524,7 +527,7 @@ pub fn username(c: &Cand) -> bool {
     !SKIP.contains(&lower.as_str()) && !is_placeholder(u)
 }
 
-/// 中国手机号：前面不是 size/bytes/id 之类的数值字段。
+/// Chinese mobile number: not preceded by a numeric field such as size/bytes/id.
 pub fn phone_cn(c: &Cand) -> bool {
     let n = digits(c.payload).len();
     if !(11..=13).contains(&n) {
@@ -533,7 +536,7 @@ pub fn phone_cn(c: &Cand) -> bool {
     !numeric_field_before(c.before)
 }
 
-/// 前面紧挨着 `size=`、`bytes:`、`id=` 这类数值字段名。
+/// Immediately preceded by a numeric field name such as `size=`, `bytes:`, `id=`.
 fn numeric_field_before(before: &[u8]) -> bool {
     let s = String::from_utf8_lossy(before).to_ascii_lowercase();
     let s = s.trim_end_matches([' ', '\t', '=', ':', '"', '\'', '[', '(']);
@@ -616,19 +619,20 @@ fn numeric_field_before(before: &[u8]) -> bool {
     })
 }
 
-/// 国际电话：8–15 位数字。
+/// International phone number: 8–15 digits.
 pub fn phone_intl(c: &Cand) -> bool {
     let n = digits(c.payload).len();
     (8..=15).contains(&n)
 }
 
-/// 关键词上下文的电话：7–15 位数字。
+/// Phone number with keyword context: 7–15 digits.
 pub fn phone_kw(c: &Cand) -> bool {
     let n = digits(c.payload).len();
     (7..=15).contains(&n)
 }
 
-/// 经纬度对：范围合法，且不全是 0.x（避免把普通小数对当坐标）。
+/// Latitude/longitude pair: within valid ranges and not both 0.x (avoids treating ordinary decimal pairs as
+/// coordinates).
 pub fn geo_pair(c: &Cand) -> bool {
     let mut it = c.payload.split(',').map(|s| s.trim().parse::<f64>());
     let (Some(Ok(lat)), Some(Ok(lon))) = (it.next(), it.next()) else {
@@ -641,7 +645,7 @@ pub fn geo_single(c: &Cand) -> bool {
     c.payload.parse::<f64>().map(|v| v.abs() <= 180.0).unwrap_or(false)
 }
 
-/// 序列号：排除 DMI 常见占位值。
+/// Serial number: excludes common DMI placeholder values.
 pub fn serial(c: &Cand) -> bool {
     let v = c.payload.trim();
     let lower = v.to_ascii_lowercase();
@@ -677,7 +681,7 @@ pub fn uuid(c: &Cand) -> bool {
     !(hex.bytes().all(|b| b == b'0') || hex.bytes().all(|b| b == b'f' || b == b'F'))
 }
 
-/// 十六进制串：同时含数字和字母（纯数字交给长数字规则）。
+/// Hex string: contains both digits and letters (all-digit strings are left to the long-number rule).
 pub fn hex_mixed(c: &Cand) -> bool {
     let b = c.payload.as_bytes();
     b.iter().any(u8::is_ascii_digit) && b.iter().any(u8::is_ascii_alphabetic)
@@ -701,7 +705,7 @@ fn shannon_entropy(s: &[u8]) -> f64 {
         .sum()
 }
 
-/// base64 / 高熵串：含大写、小写、数字，熵 ≥ 3.5 bit/字符，不是纯十六进制。
+/// base64 / high-entropy string: contains uppercase, lowercase and digits, entropy ≥ 3.5 bits/char, not pure hex.
 pub fn high_entropy(c: &Cand) -> bool {
     let b = c.payload.trim_end_matches('=').as_bytes();
     let has_upper = b.iter().any(u8::is_ascii_uppercase);
@@ -716,7 +720,7 @@ pub fn high_entropy(c: &Cand) -> bool {
     shannon_entropy(b) >= 3.5
 }
 
-/// Wi-Fi 名称：排除有线连接的默认名和虚拟网卡。
+/// Wi-Fi network name: excludes default names of wired connections and virtual NICs.
 pub fn ssid(c: &Cand) -> bool {
     let v = c.payload.trim();
     let lower = v.to_ascii_lowercase();
@@ -727,7 +731,7 @@ pub fn ssid(c: &Cand) -> bool {
     !SKIP.contains(&lower.as_str()) && !is_placeholder(v)
 }
 
-/// 硬件标识：排除空值。
+/// Hardware identifier: excludes empty values.
 pub fn hardware(c: &Cand) -> bool {
     !c.payload.trim().is_empty()
 }

@@ -1,4 +1,4 @@
-//! 规则夹具测试（数据在 tests/fixtures/rules.toml）与引擎的单元测试。
+//! Rule fixture tests (data in tests/fixtures/rules.toml) and engine unit tests.
 
 use std::collections::HashSet;
 

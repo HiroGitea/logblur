@@ -1,16 +1,16 @@
-//! 把大条目切成约 `chunk` 字节的块交给多个线程并行清洗。
+//! Splits large entries into chunks of roughly `chunk` bytes so multiple threads can scrub them in parallel.
 //!
-//! - 优先在换行处切（单行规则不会跨行，所以不会切断任何命中）；
-//! - 一行超过 `max_line` 才硬切，并尽量切在空白/分隔符后；
-//! - 不在 PEM 私钥块中间切（块最长 64 KiB）；
-//! - 非 UTF-8 文本先增量解码为 UTF-8 再切。
+//! - Cuts at newlines when possible (single-line rules never span lines, so no hit gets cut);
+//! - hard-cuts only when a line exceeds `max_line`, preferably right after whitespace/a separator;
+//! - never cuts inside a PEM private key block (blocks are at most 64 KiB);
+//! - non-UTF-8 text is first incrementally decoded to UTF-8, then cut.
 
 use memchr::{memchr, memmem, memrchr};
 
 use crate::text::StreamDecoder;
 use crate::util::floor_char_boundary;
 
-/// 切块前至少多读这么多，用于把行尾和 PEM 块收进来。
+/// Minimum extra lookahead before cutting, used to pull in the end of the line and PEM blocks.
 const SLACK: usize = 64 * 1024;
 const PEM_MAX: usize = 64 * 1024;
 
@@ -18,7 +18,7 @@ pub struct Chunker {
     buf: Vec<u8>,
     chunk: usize,
     max_line: usize,
-    /// false：二进制，按固定长度切。
+    /// false: binary, cut at fixed lengths.
     lines: bool,
     decoder: Option<StreamDecoder>,
 }
@@ -42,7 +42,7 @@ impl Chunker {
         }
     }
 
-    /// 输入结束：冲刷解码器。
+    /// End of input: flushes the decoder.
     pub fn finish_input(&mut self) {
         if let Some(d) = &mut self.decoder {
             d.push(&[], &mut self.buf, true);
@@ -58,7 +58,8 @@ impl Chunker {
         std::mem::replace(&mut self.buf, rest)
     }
 
-    /// 取下一块；`eof` 表示之后不会再有输入。返回 `None` 表示需要更多数据（或已取完）。
+    /// Takes the next chunk; `eof` means no more input will follow. Returns `None` when more data is needed (or
+    /// everything has been taken).
     pub fn take(&mut self, eof: bool) -> Option<Vec<u8>> {
         if self.buf.is_empty() {
             return None;
@@ -101,7 +102,8 @@ impl Chunker {
     }
 }
 
-/// 一行太长时的切点：尽量在最后 4 KiB 内的空白/分隔符之后，否则在字符边界。
+/// Cut point for an overlong line: preferably after whitespace/a separator within the last 4 KiB, otherwise at a
+/// character boundary.
 fn hard_cut(buf: &[u8], chunk: usize) -> usize {
     let c = chunk.min(buf.len());
     let lo = c.saturating_sub(4096);
@@ -117,7 +119,7 @@ fn hard_cut(buf: &[u8], chunk: usize) -> usize {
     }
 }
 
-/// 如果切点前有未闭合的 `-----BEGIN`，把切点推到对应 `-----END` 那一行之后。
+/// If an unclosed `-----BEGIN` precedes the cut point, moves the cut point past the matching `-----END` line.
 fn pem_extend(buf: &[u8], cut: usize) -> PemCut {
     let head = &buf[..cut];
     let Some(b) = memmem::rfind(head, b"-----BEGIN ") else { return PemCut::Keep };

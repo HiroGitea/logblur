@@ -1,10 +1,10 @@
-//! logblur-core：在内存中清洗日志压缩包里的敏感信息。
+//! logblur-core: scrubs sensitive information from log archives, in memory.
 //!
-//! 主要入口是 [`job::run`]：给定输入（zip / tar / tar.gz / gz / 单文件 / 文件夹 / stdin）、
-//! 输出位置和 [`JobConfig`]，并发地解压、识别、打码、重新压缩，返回 [`Report`]。
-//! 未打码的明文只存在于进程内存中，永远不会写到磁盘。
+//! The main entry point is [`job::run`]: given an input (zip / tar / tar.gz / gz / single file / directory / stdin),
+//! an output location and a [`JobConfig`], it decompresses, detects, masks and recompresses concurrently, and returns a
+//! [`Report`]. Unmasked plaintext only ever exists in process memory and is never written to disk.
 //!
-//! 界面文字通过 [`i18n`] 翻译：英文是源语言和回退语言，内置简体中文。
+//! UI text is translated via [`i18n`]: English is the source and fallback language, and Simplified Chinese is built in.
 
 pub mod archive;
 pub mod category;
@@ -27,5 +27,5 @@ pub use job::{CancelToken, Input, JobSpec, NoProgress, Output, Phase, ProgressEv
 pub use report::Report;
 pub use scan::Engine;
 
-/// 工具版本号（来自 Cargo.toml）。
+/// Tool version (from Cargo.toml).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

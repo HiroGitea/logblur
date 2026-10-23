@@ -1,6 +1,6 @@
-//! 任务配置：保密等级、打码方式、允许/拒绝名单、并发与内存预算。
+//! Job configuration: secrecy level, mask mode, allow/deny lists, concurrency and memory budget.
 //!
-//! 合并顺序：内置默认值 < TOML 配置文件 < 命令行 / GUI。
+//! Merge order: built-in defaults < TOML config file < command line / GUI.
 
 use std::path::Path;
 
@@ -9,26 +9,27 @@ use serde::{Deserialize, Serialize};
 use crate::category::Category;
 use crate::error::{Error, Result};
 
-/// 打码方式。
+/// Mask mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum MaskMode {
-    /// 每个字符替换为打码字符（默认 `░`），字符数不变。
+    /// Replaces each character with the mask character (default `░`), keeping the character count.
     #[default]
     Block,
-    /// 固定宽度的打码字符，隐藏原始长度。
+    /// A fixed number of mask characters, hiding the original length.
     Fixed,
-    /// 每个字符替换为 `*`。
+    /// Replaces each character with `*`.
     Star,
-    /// 类别标签，如 `[IPV4]`。
+    /// Category tag, e.g. `[IPV4]`.
     Tag,
-    /// 一致的伪名，如 `IP_k3f9xq2a`：同一原值得到同一代号。
+    /// Consistent pseudonym, e.g. `IP_k3f9xq2a`: the same original value always gets the same alias.
     Pseudo,
-    /// 保留部分信息：邮箱保留域名、卡号/电话保留末 4 位、IP 保留首段等。
+    /// Keeps part of the value: the domain of an email, the last 4 digits of a card/phone number, the first octet of an
+    /// IP, etc.
     Partial,
-    /// 直接删除。
+    /// Removes the value entirely.
     Remove,
-    /// 加盐 SHA-256 十六进制前缀。
+    /// Hex prefix of a salted SHA-256.
     Hash,
 }
 
@@ -69,16 +70,16 @@ impl MaskMode {
         MaskMode::ALL.into_iter().find(|m| m.id() == s)
     }
 
-    /// 界面上显示的名称（按当前语言）。
+    /// Display name in the UI (in the current language).
     pub fn label(self) -> String {
         crate::i18n::tr(&format!("mask.{}", self.id()))
     }
 }
 
-/// 内存上限。
+/// Memory limit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MemoryLimit {
-    /// 可用内存的 70%（并受 cgroup 限制）。
+    /// 70% of available memory (also capped by the cgroup limit).
     #[default]
     Auto,
     Bytes(u64),
@@ -86,7 +87,7 @@ pub enum MemoryLimit {
 }
 
 impl MemoryLimit {
-    /// 解析 `auto`、`2G`、`512M`、`1.5GiB`、`70%`。
+    /// Parses `auto`, `2G`, `512M`, `1.5GiB`, `70%`.
     pub fn parse(s: &str) -> Result<MemoryLimit> {
         let t = s.trim();
         if t.eq_ignore_ascii_case("auto") || t.is_empty() {
@@ -115,29 +116,29 @@ impl std::fmt::Display for MemoryLimit {
     }
 }
 
-/// 二进制条目（无法作为文本清洗的文件）如何处理。
+/// How binary entries (files that cannot be scrubbed as text) are handled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum BinaryPolicy {
-    /// 原样复制（报告中会列出并警告）。
+    /// Copy verbatim (listed with a warning in the report).
     #[default]
     Copy,
-    /// 从输出中删除。
+    /// Remove from the output.
     Drop,
 }
 
-/// 输出文本的编码。
+/// Encoding of the output text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputEncoding {
-    /// 与输入相同（GBK 进 GBK 出）。
+    /// Same as the input (GBK in, GBK out).
     #[default]
     Preserve,
-    /// 一律输出 UTF-8。
+    /// Always output UTF-8.
     Utf8,
 }
 
-/// 报告格式。
+/// Report format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReportFormat {
@@ -145,67 +146,71 @@ pub enum ReportFormat {
     Markdown,
 }
 
-/// 用户自定义规则（TOML `[[custom_rules]]`）。
+/// User-defined rule (TOML `[[custom_rules]]`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CustomRule {
     pub id: String,
-    /// 正则（Rust regex 语法，按字节匹配 UTF-8 文本）。
+    /// Regex (Rust regex syntax, matched byte-wise against UTF-8 text).
     pub pattern: String,
-    /// 打码哪个捕获组；省略时：有捕获组则用第 1 组，否则整段。
+    /// Which capture group to mask; if omitted, group 1 when the pattern has capture groups, otherwise the whole match.
     #[serde(default)]
     pub group: Option<usize>,
-    /// 归入哪个类别，默认 `custom`。
+    /// Which category the rule belongs to; defaults to `custom`.
     #[serde(default)]
     pub category: Option<Category>,
-    /// 从哪个等级开始生效，默认 1（总是生效）。
+    /// The level from which the rule takes effect; defaults to 1 (always active).
     #[serde(default)]
     pub level: Option<u8>,
 }
 
-/// 一次清洗任务的全部配置。
+/// Complete configuration of one scrub job.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JobConfig {
-    /// 保密等级 1–4，默认 3。
+    /// Secrecy level 1–4; defaults to 3.
     pub level: u8,
     pub mask: MaskMode,
-    /// 打码字符（block / fixed / partial 模式），默认 `░`。
+    /// Mask character (block / fixed / partial modes); defaults to `░`.
     pub mask_char: char,
-    /// 当输出编码无法表示 `mask_char` 时使用的字符，默认 `*`。
+    /// Character used when the output encoding cannot represent `mask_char`; defaults to `*`.
     pub fallback_char: char,
-    /// fixed 模式的宽度。
+    /// Width used by the fixed mode.
     pub fixed_width: usize,
-    /// hash 模式输出的十六进制位数。
+    /// Number of hex digits output by the hash mode.
     pub hash_len: usize,
-    /// 伪名/哈希的盐。为空时每次运行随机生成（运行内一致，跨运行不一致）。
+    /// Salt for pseudonyms/hashes. If empty, a random salt is generated on each run (consistent within a run, not
+    /// across runs).
     pub salt: Option<String>,
-    /// 伪名使用递增编号（IP_1、IP_2…）而不是哈希；为保证编号确定，会单线程运行。
+    /// Pseudonyms use increasing numbers (IP_1, IP_2…) instead of hashes; to keep the numbering deterministic, the job
+    /// runs single-threaded.
     pub counter: bool,
-    /// 只处理这些类别（为空表示不限制）。
+    /// Only process these categories (empty means no restriction).
     pub only: Vec<Category>,
-    /// 在等级之外额外启用的类别。
+    /// Categories enabled in addition to those selected by the level.
     pub enable: Vec<Category>,
-    /// 关闭的类别。
+    /// Disabled categories.
     pub skip: Vec<Category>,
-    /// 保留内网地址（10/8、172.16/12、192.168/16、100.64/10、fc00::/7）。
+    /// Keep private addresses (10/8, 172.16/12, 192.168/16, 100.64/10, fc00::/7).
     pub keep_private_ips: bool,
-    /// 先扫描一遍收集用户名/主机名等，再在全文中清洗这些值（两遍扫描）。
+    /// First scan everything to collect usernames, hostnames, etc., then scrub those values throughout the text (two
+    /// passes).
     pub learn: bool,
-    /// 同时清洗压缩包内的文件名/路径。
+    /// Also scrub file names/paths inside archives.
     pub scrub_names: bool,
-    /// 允许名单：精确值、`*.example.com`、`10.0.0.0/8`、`re:正则`。
+    /// Allow list: exact values, `*.example.com`, `10.0.0.0/8`, `re:<regex>`.
     pub allow: Vec<String>,
-    /// 拒绝名单：总要打码的词（大小写不敏感），或 `re:正则`。
+    /// Deny list: words that are always masked (case-insensitive), or `re:<regex>`.
     pub deny: Vec<String>,
     pub custom_rules: Vec<CustomRule>,
-    /// 工作线程数，`None` 表示使用全部逻辑核。
+    /// Number of worker threads; `None` means all logical cores.
     pub threads: Option<usize>,
     pub memory: MemoryLimit,
     pub binary: BinaryPolicy,
     pub output_encoding: OutputEncoding,
-    /// 流式处理的分块大小（字节）。
+    /// Chunk size for streaming (bytes).
     pub chunk_size: usize,
-    /// 超过这个大小的条目走流式分块处理；`None` 时按内存预算自动决定（测试用）。
+    /// Entries larger than this are processed as streamed chunks; `None` decides automatically from the memory budget
+    /// (for tests).
     #[doc(hidden)]
     pub whole_max: Option<usize>,
 }
@@ -263,7 +268,7 @@ impl JobConfig {
         Ok(())
     }
 
-    /// 某个类别在当前配置下是否启用。
+    /// Whether a category is enabled under the current configuration.
     pub fn category_enabled(&self, c: Category) -> bool {
         if self.skip.contains(&c) {
             return false;
@@ -274,7 +279,7 @@ impl JobConfig {
         c == Category::Custom || c.default_level() <= self.level || self.enable.contains(&c)
     }
 
-    /// 某个类别内，等级为 `rule_level` 的规则是否启用。
+    /// Whether rules of level `rule_level` within a category are enabled.
     pub fn rule_enabled(&self, c: Category, rule_level: u8) -> bool {
         if !self.category_enabled(c) {
             return false;
@@ -285,7 +290,7 @@ impl JobConfig {
         rule_level <= effective
     }
 
-    /// 读取 TOML 配置文件并合并到当前配置。
+    /// Reads a TOML config file and merges it into the current configuration.
     pub fn apply_file(&mut self, path: &Path) -> Result<()> {
         let text = std::fs::read_to_string(path).map_err(|e| Error::io_path("io.read_config", path, e))?;
         let fc: FileConfig = toml::from_str(&text).map_err(|e| Error::Config(format!("{}: {e}", path.display())))?;
@@ -363,7 +368,7 @@ impl JobConfig {
     }
 }
 
-/// TOML 配置文件的结构，所有字段可选。
+/// Structure of the TOML config file; all fields are optional.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FileConfig {
@@ -391,7 +396,7 @@ pub struct FileConfig {
     pub output_encoding: Option<OutputEncoding>,
 }
 
-/// `logblur config init` 生成的带注释模板（按当前语言）。
+/// Commented template generated by `logblur config init` (in the current language).
 pub fn config_template() -> String {
     crate::t!("config.template")
 }

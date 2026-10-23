@@ -1,4 +1,5 @@
-//! 允许名单：内置（回环地址、保留域名、系统账户、公共基础设施域名）+ 用户配置。
+//! Allow list: built-in (loopback addresses, reserved domains, system accounts, public infrastructure domains) + user
+//! configuration.
 
 use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -8,7 +9,7 @@ use regex::Regex;
 use crate::category::Category;
 use crate::error::{Error, Result};
 
-/// 系统/服务账户：出现在日志里不指向具体的人。
+/// System/service accounts: when they appear in logs they do not point to a specific person.
 const SYSTEM_USERS: &[&str] = &[
     "root",
     "nobody",
@@ -122,7 +123,8 @@ const SYSTEM_USERS: &[&str] = &[
     "defaultapppool",
 ];
 
-/// 公共基础设施域名（软件源、镜像、证书、时间服务等），出现在日志里不是隐私。
+/// Public infrastructure domains (package repositories, mirrors, certificates, time services, etc.); their appearance
+/// in logs is not private.
 const PUBLIC_DOMAINS: &[&str] = &[
     "debian.org",
     "debian.net",
@@ -212,11 +214,11 @@ const PUBLIC_DOMAINS: &[&str] = &[
     "xfce.org",
 ];
 
-/// RFC 2606 / 6761 保留域名。
+/// Reserved domains per RFC 2606 / 6761.
 const RESERVED_DOMAINS: &[&str] =
     &["example.com", "example.org", "example.net", "example", "test", "invalid", "localhost", "localdomain"];
 
-/// 不指向具体主机的 IPv4 网段：(网络地址, 前缀长度)。
+/// IPv4 ranges that do not point to a specific host: (network address, prefix length).
 const BUILTIN_V4: &[([u8; 4], u8)] = &[
     ([0, 0, 0, 0], 32),
     ([127, 0, 0, 0], 8),
@@ -243,11 +245,11 @@ const PRIVATE_V4: &[([u8; 4], u8)] =
 #[derive(Debug, Default)]
 pub struct Allowlist {
     exact: HashSet<String>,
-    /// `*.example.com` → "example.com"，匹配自身及子域名。
+    /// `*.example.com` → "example.com", matching the domain itself and its subdomains.
     domain_suffix: Vec<String>,
-    /// `*foo` → 以 foo 结尾。
+    /// `*foo` → ends with foo.
     suffix: Vec<String>,
-    /// `foo*` → 以 foo 开头。
+    /// `foo*` → starts with foo.
     prefix: Vec<String>,
     v4: Vec<(u32, u32)>,
     v6: Vec<(u128, u128)>,
@@ -339,7 +341,7 @@ impl Allowlist {
         self.regex.iter().any(|r| r.is_match(value))
     }
 
-    /// 该值是否应当保留（不打码）。
+    /// Whether the value should be kept (not masked).
     pub fn allowed(&self, cat: Category, value: &str) -> bool {
         if self.user_allowed(value) {
             return true;
@@ -353,7 +355,7 @@ fn domain_matches(host: &str, base: &str) -> bool {
         || (host.len() > base.len() && host.ends_with(base) && host.as_bytes()[host.len() - base.len() - 1] == b'.')
 }
 
-/// 去掉端口、方括号、zone 后解析 IP。
+/// Parses an IP after stripping the port, brackets and zone.
 fn parse_ip_loose(v: &str) -> Option<IpAddr> {
     let v = v.trim_matches(|c| c == '[' || c == ']');
     let v = v.split('%').next().unwrap_or(v);

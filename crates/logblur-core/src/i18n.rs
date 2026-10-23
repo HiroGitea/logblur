@@ -1,21 +1,24 @@
-//! 多语言。英文是源语言和回退语言，内置简体中文；可以从外部目录加载更多语言或覆盖译文。
+//! Localization. English is the source and fallback language, and Simplified Chinese is built in; more languages can
+//! be loaded, or translations overridden, from external directories.
 //!
-//! 语言选择顺序：显式指定（`--lang`）> `LOGBLUR_LANG` > `LANGUAGE`（冒号分隔的列表）
-//! > `LC_ALL` > `LC_MESSAGES` > `LANG` > 系统区域（调用方传入）> `en`。`C` / `POSIX` 视为英文。
+//! Language selection order: explicit (`--lang`) > `LOGBLUR_LANG` > `LANGUAGE` (colon-separated list) > `LC_ALL` >
+//! `LC_MESSAGES` > `LANG` > system locale (passed in by the caller) > `en`. `C` / `POSIX` count as English.
 //!
-//! 语言文件是 TOML：表名和键名拼成点分键（`[error] cancelled = "…"` → `error.cancelled`），
-//! `[meta] tag` / `name` 给出语言标签和本地名称。占位符写作 `{name}`，没有对应参数的 `{…}` 原样保留。
-//! 外部语言文件目录（后者优先级更低）：`$LOGBLUR_LOCALE_DIR`、`$XDG_DATA_HOME/logblur/locales`
-//!（或 `~/.local/share/logblur/locales`）、`/usr/local/share/logblur/locales`、`/usr/share/logblur/locales`。
+//! Language files are TOML: table and key names are joined into dotted keys (`[error] cancelled = "…"` →
+//! `error.cancelled`); `[meta] tag` / `name` give the language tag and native name. Placeholders are written as
+//! `{name}`; a `{…}` with no matching argument is kept as is.
+//! External language file directories (later ones have lower priority): `$LOGBLUR_LOCALE_DIR`,
+//! `$XDG_DATA_HOME/logblur/locales` (or `~/.local/share/logblur/locales`), `/usr/local/share/logblur/locales`,
+//! `/usr/share/logblur/locales`.
 //!
-//! 机器可读的输出（JSON 报告的键、类别 id、配置键、退出码）不翻译。
+//! Machine-readable output (JSON report keys, category ids, config keys, exit codes) is not translated.
 
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-/// 内置语言文件。
+/// Built-in language files.
 const BUILTIN: &[(&str, &str)] =
     &[("en", include_str!("../locales/en.toml")), ("zh-CN", include_str!("../locales/zh-CN.toml"))];
 
@@ -102,7 +105,7 @@ fn load_all() -> Vec<Catalog> {
     cats
 }
 
-/// `zh_CN.UTF-8@euro` → `zh-cn`；`C`、`POSIX` → `en`。
+/// `zh_CN.UTF-8@euro` → `zh-cn`; `C`, `POSIX` → `en`.
 fn normalize(raw: &str) -> Option<String> {
     let s = raw.trim();
     let s = s.split(['.', '@']).next().unwrap_or(s);
@@ -149,7 +152,7 @@ fn candidates(explicit: Option<&str>, system: Option<&str>) -> Vec<String> {
     v
 }
 
-/// 初始化：加载语言文件并按优先级选择语言。可以重复调用。
+/// Initializes i18n: loads the language files and picks a language by priority. Can be called repeatedly.
 pub fn init(explicit: Option<&str>, system_locale: Option<&str>) {
     let cats = load_all();
     let current = candidates(explicit, system_locale)
@@ -169,7 +172,7 @@ fn state() -> Arc<State> {
     STATE.read().unwrap_or_else(|e| e.into_inner()).as_ref().cloned().expect("i18n 已初始化")
 }
 
-/// 切换语言；没有这种语言时返回 false。
+/// Switches the language; returns false if the language is not available.
 pub fn set_language(tag: &str) -> bool {
     let st = state();
     match find(&st.catalogs, tag) {
@@ -182,13 +185,13 @@ pub fn set_language(tag: &str) -> bool {
     }
 }
 
-/// 当前语言标签，如 `en`、`zh-CN`。
+/// Current language tag, e.g. `en`, `zh-CN`.
 pub fn language() -> String {
     let st = state();
     st.catalogs.get(st.current).map(|c| c.tag.clone()).unwrap_or_else(|| "en".into())
 }
 
-/// 可用语言：(标签, 本地名称)。
+/// Available languages: (tag, native name).
 pub fn languages() -> Vec<(String, String)> {
     state().catalogs.iter().map(|c| (c.tag.clone(), c.name.clone())).collect()
 }
@@ -201,22 +204,22 @@ fn lookup(st: &State, key: &str) -> Option<String> {
         .cloned()
 }
 
-/// 翻译；找不到时返回键本身。
+/// Translates; returns the key itself if no translation is found.
 pub fn tr(key: &str) -> String {
     lookup(&state(), key).unwrap_or_else(|| key.to_string())
 }
 
-/// 翻译；找不到时返回 `default`。
+/// Translates; returns `default` if no translation is found.
 pub fn tr_or(key: &str, default: &str) -> String {
     lookup(&state(), key).unwrap_or_else(|| default.to_string())
 }
 
-/// 翻译并填入命名参数。
+/// Translates and fills in named arguments.
 pub fn trf(key: &str, args: &[(&str, &dyn Display)]) -> String {
     fill(&tr(key), args)
 }
 
-/// 把 `{name}` 替换成参数；没有对应参数的 `{…}` 原样保留。
+/// Replaces `{name}` with the argument; a `{…}` with no matching argument is kept as is.
 pub fn fill(template: &str, args: &[(&str, &dyn Display)]) -> String {
     use std::fmt::Write as _;
     let mut out = String::with_capacity(template.len() + 16);
@@ -248,7 +251,7 @@ pub fn fill(template: &str, args: &[(&str, &dyn Display)]) -> String {
     out
 }
 
-/// 翻译宏：`t!("error.cancelled")`、`t!("io.open", path = p.display())`。
+/// Translation macro: `t!("error.cancelled")`, `t!("io.open", path = p.display())`.
 #[macro_export]
 macro_rules! t {
     ($key:expr $(,)?) => {

@@ -1,4 +1,4 @@
-//! 对外入口：一次清洗任务。
+//! Public entry point: one scrub job.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -22,11 +22,11 @@ pub enum Input {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Output {
-    /// 输入旁边的 `*.blurred.*`；stdin 输入时为 stdout。
+    /// `*.blurred.*` next to the input; stdout when the input is stdin.
     Auto,
     Path(PathBuf),
     Stdout,
-    /// 只统计不写出（--dry-run）。
+    /// Only collect statistics, write nothing (--dry-run).
     Discard,
 }
 
@@ -34,11 +34,11 @@ pub enum Output {
 pub struct JobSpec {
     pub input: Input,
     pub output: Output,
-    /// 覆盖已存在的输出。
+    /// Overwrite existing output.
     pub force: bool,
 }
 
-/// 解析后的输入输出。
+/// Resolved input and output.
 #[derive(Debug, Clone)]
 pub struct Resolved {
     pub input_kind: InputKind,
@@ -72,9 +72,9 @@ impl JobSpec {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
-    /// 第一遍：学习用户名、主机名等。
+    /// First pass: learn usernames, hostnames, etc.
     Learn,
-    /// 第二遍：清洗并写出。
+    /// Second pass: scrub and write output.
     Scrub,
 }
 
@@ -90,7 +90,7 @@ pub enum ProgressEvent {
         index: u64,
         name: String,
     },
-    /// 已读取（解压后）的字节数。
+    /// Bytes read so far (uncompressed).
     Bytes {
         phase: Phase,
         done: u64,
@@ -108,14 +108,15 @@ impl<F: Fn(ProgressEvent) + Sync> ProgressSink for F {
     }
 }
 
-/// 不关心进度。
+/// Progress sink that ignores progress.
 pub struct NoProgress;
 
 impl ProgressSink for NoProgress {
     fn event(&self, _e: ProgressEvent) {}
 }
 
-/// 取消令牌：从任何线程调用 [`CancelToken::cancel`]，任务会尽快停止并删除未完成的输出。
+/// Cancellation token: call [`CancelToken::cancel`] from any thread and the job stops as soon as possible and deletes
+/// unfinished output.
 #[derive(Debug, Clone, Default)]
 pub struct CancelToken(Arc<AtomicBool>);
 
@@ -140,7 +141,7 @@ fn same_file(a: &Path, b: &Path) -> bool {
     }
 }
 
-/// 执行一次清洗任务。
+/// Runs one scrub job.
 pub fn run(spec: &JobSpec, cfg: &JobConfig, progress: &dyn ProgressSink, cancel: &CancelToken) -> Result<Report> {
     let started = Instant::now();
     cfg.validate()?;

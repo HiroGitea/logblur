@@ -1,16 +1,19 @@
-//! 内置规则表（唯一出处）。顺序即优先级：重叠时更早的规则决定类别标签。
+//! Built-in rule table (the single source of truth). Order is priority: on overlap the earlier rule decides the
+//! category tag.
 //!
-//! 约定：
-//! - 单行规则不得匹配换行（不用裸 `\s` 跨行、不用 `(?s)`）；唯一的多行规则是 PEM 私钥。
-//! - 所有规则以多行 + CRLF 模式编译，`^` 表示行首。
-//! - 数字用 `[0-9]` 而不是 `\d`（后者在 Unicode 模式下包含其他文字的数字）。
-//! - 前导上下文写成非捕获组，尾部边界交给 `after` 检查，分隔符不会被吃掉。
+//! Conventions:
+//! - Single-line rules must not match newlines (no bare `\s` across lines, no `(?s)`); the only multi-line rule is
+//!   PEM private keys.
+//! - All rules are compiled in multi-line + CRLF mode, so `^` means start of line.
+//! - Digits are written `[0-9]` rather than `\d` (the latter includes digits of other scripts in Unicode mode).
+//! - Leading context is written as a non-capturing group and the trailing boundary is left to the `after` check, so
+//!   separators are not consumed.
 
 use super::validators as v;
 use super::{Cand, Rule};
 use crate::category::Category as C;
 
-/// 常见默认主机名：学到它们没有意义，还会误伤正文（如 "debian"）。
+/// Common default hostnames: learning them is pointless and would also hit ordinary text (e.g. "debian").
 pub const GENERIC_HOSTNAMES: &[&str] = &[
     "localhost",
     "debian",
@@ -73,7 +76,7 @@ fn cli_value(c: &Cand) -> bool {
     !c.payload.starts_with('-') && v::secret_value(c)
 }
 
-/// 全部内置规则。
+/// All built-in rules.
 pub fn builtin() -> Vec<Rule> {
     vec![
         // ───────────────────────── 1 凭据 ─────────────────────────

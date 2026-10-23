@@ -2,7 +2,7 @@ use std::fmt;
 use std::io;
 use std::path::Path;
 
-/// logblur 的统一错误类型。显示文本按当前界面语言翻译。
+/// Unified error type of logblur. The display text is translated into the current UI language.
 #[derive(Debug)]
 pub enum Error {
     Io { context: String, source: io::Error },
@@ -48,7 +48,7 @@ impl Error {
         Error::Io { context: context.into(), source }
     }
 
-    /// `key` 是带 `{path}` 占位符的翻译键，如 `io.open`。
+    /// `key` is a translation key with a `{path}` placeholder, e.g. `io.open`.
     pub fn io_path(key: &str, path: &Path, source: io::Error) -> Self {
         Error::Io { context: crate::t!(key, path = path.display()), source }
     }
@@ -62,7 +62,7 @@ impl Error {
     }
 }
 
-/// 给 `io::Result` 加上下文。
+/// Adds context to an `io::Result`.
 pub(crate) trait IoContext<T> {
     fn ctx(self, context: impl FnOnce() -> String) -> Result<T>;
 }

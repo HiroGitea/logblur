@@ -1,8 +1,8 @@
-//! 规则定义：类别、等级、正则、打码的捕获组、校验函数、边界检查。
+//! Rule definitions: category, level, regex, capture group to mask, validator, boundary check.
 //!
-//! `regex` crate 不支持环视，所以「上下文 + 目标」写在同一个正则里，
-//! 再用 `group` 指定只打码目标所在的捕获组；尾部边界用 `after` 函数事后检查，
-//! 这样分隔符不会被吃掉，相邻的两个目标都能命中。
+//! The `regex` crate does not support lookaround, so "context + target" are written in a single regex and
+//! `group` selects the capture group holding the target to mask; the trailing boundary is checked afterwards by an
+//! `after` function, so separators are not consumed and two adjacent targets can both match.
 
 pub mod allow;
 pub mod protect;
@@ -13,40 +13,42 @@ use std::borrow::Cow;
 
 use crate::category::Category;
 
-/// 候选命中，交给校验函数判断。
+/// Candidate hit, handed to the validator for a decision.
 pub struct Cand<'a> {
-    /// 要打码的文本。
+    /// The text to mask.
     pub payload: &'a str,
-    /// 整个正则匹配（含上下文）。
+    /// The whole regex match (including context).
     pub whole: &'a str,
-    /// payload 之前同一行内最多 64 字节。
+    /// Up to 64 bytes before the payload, within the same line.
     pub before: &'a [u8],
-    /// payload 之后最多 64 字节。
+    /// Up to 64 bytes after the payload.
     pub after: &'a [u8],
 }
 
 pub type Validator = fn(&Cand) -> bool;
-/// 尾部边界检查：参数是 payload 之后的剩余字节，返回 true 表示边界合法。
+/// Trailing boundary check: the argument is the remaining bytes after the payload; returns true if the boundary is
+/// valid.
 pub type AfterCheck = fn(&[u8]) -> bool;
 
-/// `group` 取这个值表示「第一个参与匹配的捕获组」。
+/// When `group` is set to this value, it means "the first capture group that participated in the match".
 pub const FIRST_GROUP: usize = usize::MAX;
 
 #[derive(Clone)]
 pub struct Rule {
     pub id: Cow<'static, str>,
     pub category: Category,
-    /// 从哪个保密等级开始生效。
+    /// The secrecy level from which the rule takes effect.
     pub level: u8,
     pub desc: Cow<'static, str>,
     pub pattern: Cow<'static, str>,
-    /// 打码的捕获组：0 = 整段匹配，`FIRST_GROUP` = 第一个参与匹配的组。
+    /// Capture group to mask: 0 = the whole match, `FIRST_GROUP` = the first group that participated in the match.
     pub group: usize,
     pub validator: Option<Validator>,
     pub after: Option<AfterCheck>,
-    /// 是否避开保护区间（版本号、时间戳等）。
+    /// Whether to avoid protected ranges (version numbers, timestamps, etc.).
     pub protect: bool,
-    /// 命中的值是否加入「已学习标识」，在第二遍中全文清洗。
+    /// Whether matched values are added to the "learned identifiers", which are scrubbed throughout the text in the
+    /// second pass.
     pub learn: bool,
 }
 
@@ -61,7 +63,7 @@ impl std::fmt::Debug for Rule {
 }
 
 impl Rule {
-    /// 内置规则构造器。
+    /// Constructor for built-in rules.
     pub fn new(id: &'static str, category: Category, level: u8, desc: &'static str, pattern: &'static str) -> Rule {
         Rule {
             id: Cow::Borrowed(id),
@@ -77,7 +79,7 @@ impl Rule {
         }
     }
 
-    /// 打码整段匹配。
+    /// Masks the whole match.
     pub fn whole(mut self) -> Self {
         self.group = 0;
         self

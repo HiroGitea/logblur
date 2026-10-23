@@ -1,4 +1,4 @@
-//! 打码：把命中区间替换成打码字符、标签、伪名或哈希。
+//! Masking: replaces hit ranges with mask characters, tags, pseudonyms or hashes.
 
 use std::collections::HashMap;
 use std::net::Ipv6Addr;
@@ -43,7 +43,7 @@ impl Masker {
         }
     }
 
-    /// 同一个盐与计数器，换一种模式（用于文件名）。
+    /// Same salt and counter with a different mode (used for file names).
     pub fn with_mode(&self, mode: MaskMode) -> Masker {
         Masker { mode, ..self.clone() }
     }
@@ -56,17 +56,17 @@ impl Masker {
         self.mask_char
     }
 
-    /// 报告里展示的盐指纹（只有用户给定盐时才有意义）。
+    /// Salt fingerprint shown in the report (only meaningful when the user supplied the salt).
     pub fn salt_fingerprint(&self) -> Option<String> {
         self.user_salt.then(|| hex_lower(&sha256(&self.salt)[..4]))
     }
 
-    /// 计数模式需要单线程才能保证编号确定。
+    /// Counter mode needs a single thread to keep the numbering deterministic.
     pub fn needs_sequential(&self) -> bool {
         self.counter.is_some()
     }
 
-    /// 按命中区间生成输出。
+    /// Produces the output from the hit ranges.
     pub fn apply(&self, hay: &[u8], found: &[Found], out: &mut Vec<u8>, counts: &mut Counts, ch: char) {
         out.reserve(hay.len() + hay.len() / 8 + 16);
         let mut last = 0usize;
@@ -149,7 +149,7 @@ impl Masker {
     }
 }
 
-/// 伪名/哈希前的规范化：同一个值的不同写法得到同一个代号。
+/// Normalization before pseudonymizing/hashing: different spellings of the same value get the same alias.
 fn normalize(cat: Category, s: &str) -> String {
     use Category::*;
     match cat {
@@ -165,10 +165,10 @@ fn normalize(cat: Category, s: &str) -> String {
     }
 }
 
-/// 部分保留：
-/// - 邮箱保留 `@域名`；电话/卡号/证件号保留末 4 位；
-/// - IPv4 保留第一段，IPv6 保留第一组，MAC 保留厂商前缀（前 3 字节）；
-/// - 主机名保留顶级域，URL 保留协议；口令和密钥一律全部遮盖。
+/// Partial masking keeps:
+/// - the `@domain` of emails; the last 4 digits of phone/card/ID numbers;
+/// - the first octet of IPv4, the first group of IPv6, the vendor prefix (first 3 bytes) of MACs;
+/// - the top-level domain of hostnames and the scheme of URLs; passwords and keys are always fully masked.
 fn partial(cat: Category, payload: &str, ch: char, out: &mut Vec<u8>) {
     use Category::*;
     let keep_sep = |c: char| matches!(c, '.' | ':' | '-' | ' ' | '@' | '/' | '\n' | '\r');

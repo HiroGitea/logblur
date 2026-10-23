@@ -1,9 +1,9 @@
-//! 扫描引擎：对一段 UTF-8（或基本是 UTF-8）的字节逐条规则扫描，
-//! 经过尾部边界、保护区间、校验函数、允许名单过滤后，合并重叠区间。
+//! Scan engine: scans a run of UTF-8 (or mostly UTF-8) bytes rule by rule, filters the hits through the trailing
+//! boundary check, protected ranges, validators and the allow list, then merges overlapping ranges.
 //!
-//! 每条规则独立扫描一遍（regex crate 会用字面量前缀做 SIMD 预过滤），
-//! 好处是任何位置都不会因为别的规则抢先匹配而漏掉。`Scanner` 的边界留在这里，
-//! 将来可以替换成 GPU 或多模式自动机实现。
+//! Each rule scans the input independently (the regex crate uses literal prefixes for SIMD prefiltering), so no
+//! position is ever missed because another rule matched it first. The `Scanner` boundary stays here so the
+//! implementation can later be replaced with a GPU or multi-pattern automaton.
 
 mod resolve;
 
@@ -25,13 +25,13 @@ use crate::util::ceil_char_boundary;
 
 pub use resolve::resolve;
 
-/// 一处命中：`[start, end)` 字节区间。
+/// One hit: the byte range `[start, end)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Found {
     pub start: usize,
     pub end: usize,
     pub category: Category,
-    /// 规则序号；`RULE_LEARNED` / `RULE_DENY` 为特殊来源。
+    /// Rule index; `RULE_LEARNED` / `RULE_DENY` mark special sources.
     pub rule: u16,
 }
 
@@ -48,7 +48,7 @@ struct Learned {
     cats: Vec<Category>,
 }
 
-/// 可插拔的扫描器接口（当前唯一实现是 [`Engine`]）。
+/// Pluggable scanner interface (the only current implementation is [`Engine`]).
 pub trait Scanner: Send + Sync {
     fn find(&self, hay: &[u8], out: &mut Vec<Found>);
 }
@@ -82,7 +82,7 @@ fn as_str(b: &[u8]) -> Cow<'_, str> {
     }
 }
 
-/// 规则列表的一行（`logblur rules list`）。
+/// One row of the rule list (`logblur rules list`).
 #[derive(Debug, Clone)]
 pub struct RuleInfo {
     pub id: String,
@@ -180,7 +180,7 @@ impl Engine {
         })
     }
 
-    /// 所有内置规则及其在 `cfg` 下是否启用。
+    /// All built-in rules and whether each is enabled under `cfg`.
     pub fn rule_infos(cfg: &JobConfig) -> Vec<RuleInfo> {
         let mut v: Vec<RuleInfo> = builtin()
             .into_iter()
@@ -225,7 +225,7 @@ impl Engine {
         &self.masker
     }
 
-    /// 每个类别学到了多少个标识。
+    /// Number of identifiers learned per category.
     pub fn learned_counts(&self) -> [usize; Category::COUNT] {
         self.learned_count
     }
@@ -251,7 +251,7 @@ impl Engine {
         v
     }
 
-    /// 跑一条规则，对每个通过检查的命中调用 `hit(start, end)`。
+    /// Runs one rule and calls `hit(start, end)` for every hit that passes the checks.
     fn run_rule(&self, c: &Compiled, hay: &[u8], protect: &[(usize, usize)], hit: &mut dyn FnMut(usize, usize)) {
         let mut locs = c.re.capture_locations();
         let mut pos = 0usize;
@@ -323,7 +323,7 @@ impl Engine {
         b.is_ascii_alphanumeric() || b == b'_'
     }
 
-    /// 找出所有命中（已合并、排序）。
+    /// Finds all hits (merged and sorted).
     pub fn find(&self, hay: &[u8], out: &mut Vec<Found>) {
         out.clear();
         let protect = if self.need_protect { self.protect_ranges(hay) } else { Vec::new() };
@@ -355,21 +355,21 @@ impl Engine {
         });
     }
 
-    /// 清洗一段文本，结果追加到 `out`。
+    /// Scrubs a chunk of text, appending the result to `out`.
     pub fn scrub(&self, hay: &[u8], out: &mut Vec<u8>, counts: &mut Counts, mask_char: char) {
         let mut found = Vec::new();
         self.find(hay, &mut found);
         self.masker.apply(hay, &found, out, counts, mask_char);
     }
 
-    /// 清洗字符串，返回新字符串（用于命令行测试、预览）。
+    /// Scrubs a string and returns a new one (used for command-line testing and previews).
     pub fn scrub_str(&self, s: &str, counts: &mut Counts) -> String {
         let mut out = Vec::with_capacity(s.len());
         self.scrub(s.as_bytes(), &mut out, counts, self.masker.mask_char());
         String::from_utf8(out).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
     }
 
-    /// 清洗压缩包里的条目名/路径。`/` 开头以便家目录规则生效。
+    /// Scrubs an entry name/path inside an archive. A leading `/` is added so home-directory rules apply.
     pub fn scrub_name(&self, name: &str, counts: &mut Counts) -> String {
         let leading = name.starts_with('/');
         let hay = if leading { name.to_string() } else { format!("/{name}") };
@@ -384,7 +384,7 @@ impl Engine {
         if leading { s } else { s.strip_prefix('/').map(str::to_string).unwrap_or(s) }
     }
 
-    /// 只跑「学习」规则，收集值。
+    /// Runs only the "learning" rules and collects the values.
     pub fn learn(&self, hay: &[u8], out: &mut HashSet<(Category, String)>) {
         for c in self.rules.iter().filter(|c| c.rule.learn) {
             let cat = c.rule.category;
@@ -401,7 +401,8 @@ impl Engine {
         self.rules.iter().any(|c| c.rule.learn)
     }
 
-    /// 设置第二遍使用的「已学习标识」。会过滤掉太短、纯数字、通用名和允许名单里的值。
+    /// Sets the "learned identifiers" used in the second pass. Filters out values that are too short, purely numeric,
+    /// generic names, or on the allow list.
     pub fn set_learned(&mut self, values: impl IntoIterator<Item = (Category, String)>) -> Result<()> {
         let mut uniq: Vec<(Category, String)> = Vec::new();
         let mut seen = HashSet::new();

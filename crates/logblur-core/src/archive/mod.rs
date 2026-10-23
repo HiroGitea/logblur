@@ -1,4 +1,4 @@
-//! 输入源与输出端：zip、tar、tar.gz、单个 .gz、单个文件、文件夹、标准输入输出。
+//! Input sources and output sinks: zip, tar, tar.gz, single .gz, single file, directory, stdin/stdout.
 
 pub mod sink;
 
@@ -14,7 +14,7 @@ pub enum InputKind {
     Zip,
     Tar,
     TarGz,
-    /// 单个 gzip 压缩的文本（如 syslog.2.gz）。
+    /// A single gzip-compressed text file (e.g. syslog.2.gz).
     Gz,
     File,
     Dir,
@@ -34,7 +34,7 @@ impl InputKind {
         }
     }
 
-    /// 能否读第二遍（学习阶段需要）。
+    /// Whether the input can be read a second time (needed by the learning pass).
     pub fn rereadable(self) -> bool {
         self != InputKind::Stdin
     }
@@ -58,22 +58,22 @@ pub enum EntryKind {
     Dir,
     Symlink(String),
     HardLink(String),
-    /// 设备文件、FIFO 等：跳过。
+    /// Device files, FIFOs, etc.: skipped.
     Other(String),
 }
 
-/// 条目的元数据。进入流水线后 `name` 会被替换成清洗过的名字。
+/// Metadata of an entry. Once the entry enters the pipeline, `name` is replaced with the scrubbed name.
 #[derive(Debug, Clone)]
 pub struct EntryMeta {
     pub name: String,
     pub kind: EntryKind,
-    /// 解压后的大小（已知时）。
+    /// Uncompressed size (when known).
     pub size: Option<u64>,
     pub mode: Option<u32>,
-    /// Unix 秒。
+    /// Unix seconds.
     pub mtime: Option<i64>,
     pub zip_time: Option<zip::DateTime>,
-    /// 源 zip 中的序号（用于原样复制二进制条目）。
+    /// Index in the source zip (used to copy binary entries verbatim).
     pub zip_index: Option<usize>,
     pub encrypted: bool,
 }
@@ -93,18 +93,18 @@ impl EntryMeta {
     }
 }
 
-/// 访问者：返回 `Ok(false)` 停止遍历。
+/// Visitor callback: return `Ok(false)` to stop the traversal.
 pub type Visitor<'a> = dyn FnMut(EntryMeta, Option<&mut dyn Read>) -> Result<bool> + 'a;
 
 pub trait Source {
     fn kind(&self) -> InputKind;
-    /// 所有条目解压后的总字节数（已知时，用于进度）。
+    /// Total uncompressed size of all entries in bytes (when known; used for progress).
     fn total_bytes(&self) -> Option<u64>;
     fn entry_count(&self) -> Option<u64>;
     fn visit(&mut self, f: &mut Visitor<'_>) -> Result<()>;
 }
 
-/// 读满 `buf` 直到 `limit` 字节或 EOF；返回是否到达 EOF。
+/// Reads into `buf` until it holds `limit` bytes or EOF is hit; returns whether EOF was reached.
 pub fn read_up_to(r: &mut dyn Read, buf: &mut Vec<u8>, limit: usize) -> io::Result<bool> {
     let mut chunk = [0u8; 64 * 1024];
     while buf.len() < limit {
@@ -123,7 +123,7 @@ fn lower_name(p: &Path) -> String {
     p.file_name().map(|s| s.to_string_lossy().to_ascii_lowercase()).unwrap_or_default()
 }
 
-/// 根据魔数和扩展名判断输入类型。
+/// Detects the input type from magic bytes and the file extension.
 pub fn detect_input(path: &Path) -> Result<InputKind> {
     let md = fs::metadata(path).map_err(|e| Error::io_path("io.access", path, e))?;
     if md.is_dir() {
@@ -154,8 +154,8 @@ pub fn detect_input(path: &Path) -> Result<InputKind> {
     Ok(InputKind::File)
 }
 
-/// 默认输出路径：`foo.zip → foo.blurred.zip`、`app.log → app.blurred.log`、
-/// `syslog.2.gz → syslog.2.blurred.gz`、`dir → dir.blurred.zip`。
+/// Default output path: `foo.zip → foo.blurred.zip`, `app.log → app.blurred.log`,
+/// `syslog.2.gz → syslog.2.blurred.gz`, `dir → dir.blurred.zip`.
 pub fn default_output_path(input: &Path, kind: InputKind) -> PathBuf {
     let parent = input.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
     let name = input.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "output".to_string());
@@ -183,7 +183,7 @@ pub fn default_output_path(input: &Path, kind: InputKind) -> PathBuf {
     parent.join(file_name)
 }
 
-/// 由输出路径的扩展名决定输出格式。
+/// Picks the output format from the extension of the output path.
 pub fn output_kind_for(input: InputKind, out: &Path) -> OutputKind {
     let lower = out.to_string_lossy().to_ascii_lowercase();
     if lower.ends_with(".zip") {
@@ -201,7 +201,8 @@ pub fn output_kind_for(input: InputKind, out: &Path) -> OutputKind {
     }
 }
 
-/// 压缩包里的名字：UTF-8 优先，其次 GBK（中文 Windows 打的包），最后按原样有损转换。
+/// Decodes a name inside an archive: UTF-8 first, then GBK (archives made on Chinese Windows), otherwise a lossy
+/// conversion of the raw bytes.
 pub fn decode_name(raw: &[u8]) -> String {
     if let Ok(s) = std::str::from_utf8(raw) {
         return s.to_string();
@@ -556,7 +557,7 @@ impl Source for DirSource {
     }
 }
 
-/// 打开输入源。
+/// Opens an input source.
 pub fn open_source(path: Option<&Path>, kind: InputKind) -> Result<Box<dyn Source>> {
     Ok(match (kind, path) {
         (InputKind::Stdin, _) => Box::new(SingleSource::stdin()),

@@ -1,9 +1,9 @@
-//! 保护区间：版本号、时间戳等「长得像敏感信息但不是」的文本。
-//! 标记了 `protect` 的规则（IPv4、长数字、十六进制、电话等）不会打码与保护区间重叠的候选。
-//! 宁可多打码也不漏打：像 `host-10.0.0.1` 这种无法区分版本号与 IP 的写法不做保护。
-//! 所有模式以多行模式编译，`^` 表示行首。
+//! Protected ranges: text such as version numbers and timestamps that "looks sensitive but isn't".
+//! Rules marked `protect` (IPv4, long numbers, hex, phone numbers, etc.) do not mask candidates that overlap a
+//! protected range. Over-masking beats under-masking: forms like `host-10.0.0.1`, where a version number cannot be told
+//! apart from an IP, are not protected. All patterns are compiled in multi-line mode, so `^` means start of line.
 
-/// (说明, 正则)
+/// (description, regex)
 pub const PROTECT_PATTERNS: &[(&str, &str)] = &[
     (
         "关键词后的版本号：version 1.2.3.4、jdk 17.0.0.1、firmware: 2.10.0.4",

@@ -1,5 +1,5 @@
-//! 输出端。所有输出先写到 `<目标>.part`，成功后再改名；出错或取消时删除。
-//! 写到磁盘的只有已经清洗过的数据。
+//! Output sinks. All output is first written to `<target>.part` and renamed on success; it is deleted on error or
+//! cancellation. Only scrubbed data is ever written to disk.
 
 use std::fs::{self, File};
 use std::io::{self, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write};
@@ -14,11 +14,11 @@ use super::{EntryMeta, OutputKind, unix_to_zip_time};
 use crate::error::{Error, IoContext, Result, ZipContext};
 
 pub trait Sink: Send {
-    /// 是否接受工作线程预先压缩好的「单条目 zip」（并行压缩）。
+    /// Whether the sink accepts "single-entry zips" pre-compressed by worker threads (parallel compression).
     fn supports_zip_blob(&self) -> bool {
         false
     }
-    /// 是否能从源 zip 原样复制条目（二进制、加密条目）。
+    /// Whether the sink can copy entries verbatim from the source zip (binary and encrypted entries).
     fn supports_raw_copy(&self) -> bool {
         false
     }
@@ -31,17 +31,17 @@ pub trait Sink: Send {
     fn raw_copy(&mut self, m: &EntryMeta, _index: usize) -> Result<()> {
         Err(Error::Other(crate::t!("pipeline.no_raw_copy", name = m.name)))
     }
-    /// 流式写一个大条目：begin → write… → end。
+    /// Streams one large entry: begin → write… → end.
     fn begin(&mut self, m: &EntryMeta) -> Result<()>;
     fn write(&mut self, data: &[u8]) -> Result<()>;
     fn end(&mut self) -> Result<()>;
-    /// 完成并改名，返回输出字节数。
+    /// Finishes and renames the output; returns the number of bytes written.
     fn finish(self: Box<Self>) -> Result<u64>;
-    /// 放弃：删除未完成的输出。
+    /// Gives up: deletes the unfinished output.
     fn abort(self: Box<Self>);
 }
 
-/// `<目标>.part`
+/// `<target>.part`
 pub fn part_path(final_path: &Path) -> PathBuf {
     let mut s = final_path.as_os_str().to_os_string();
     s.push(".part");
@@ -58,7 +58,7 @@ fn remove_any(p: &Path) {
     }
 }
 
-/// 把 `.part` 改名为最终路径。
+/// Renames the `.part` file to the final path.
 fn commit(part: &Path, final_path: &Path, force: bool) -> Result<()> {
     if fs::symlink_metadata(final_path).is_ok() {
         if !force {
@@ -83,7 +83,7 @@ fn size_of(p: &Path) -> u64 {
     walk(p)
 }
 
-/// 去掉绝对路径前缀和 `..`，防止写出到目标目录之外。
+/// Strips absolute-path prefixes and `..` so nothing can be written outside the target directory.
 pub fn sanitize_rel(name: &str) -> String {
     let unified = name.replace('\\', "/");
     let mut parts: Vec<String> = Vec::new();
@@ -114,7 +114,8 @@ fn zip_options(m: &EntryMeta, large: bool) -> SimpleFileOptions {
     o
 }
 
-/// 工作线程用：把一个条目压成只含它的内存 zip，写线程再零重压缩地合并进输出。
+/// For worker threads: compresses one entry into an in-memory zip containing only that entry; the writer thread then
+/// merges it into the output without recompressing.
 pub fn make_zip_blob(m: &EntryMeta, data: &[u8]) -> Result<Vec<u8>> {
     let mut w = ZipWriter::new(Cursor::new(Vec::with_capacity(data.len() / 3 + 512)));
     w.start_file(m.name.clone(), zip_options(m, data.len() as u64 >= 0xF000_0000)).zctx(|| m.name.clone())?;
@@ -122,7 +123,7 @@ pub fn make_zip_blob(m: &EntryMeta, data: &[u8]) -> Result<Vec<u8>> {
     Ok(w.finish().zctx(|| m.name.clone())?.into_inner())
 }
 
-/// gzip 压缩一段数据（嵌套的 .gz 日志写回时用）。
+/// Gzip-compresses a chunk of data (used when writing nested .gz logs back).
 pub fn gzip(data: &[u8]) -> Result<Vec<u8>> {
     let mut e = GzEncoder::new(Vec::with_capacity(data.len() / 3 + 64), Compression::new(6));
     e.write_all(data).ctx(|| "gzip".into())?;
@@ -262,8 +263,8 @@ impl Write for TarOut {
     }
 }
 
-/// 流式条目的暂存：tar 头需要先写大小，而打码会改变字节数。
-/// 先放内存，超过上限再写到匿名临时文件（只含已清洗的数据）。
+/// Staging buffer for a streamed entry: a tar header must contain the size up front, but masking changes the byte
+/// count. Data is kept in memory first and spills to an anonymous temporary file past a limit (scrubbed data only).
 struct Spill {
     mem: Vec<u8>,
     file: Option<File>,
@@ -641,7 +642,7 @@ impl Sink for OneSink {
     }
 }
 
-/// 按输出类型创建输出端。
+/// Creates the output sink for the given output kind.
 pub fn create_sink(
     kind: OutputKind,
     path: Option<&Path>,

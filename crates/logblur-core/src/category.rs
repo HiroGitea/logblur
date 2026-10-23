@@ -1,14 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-/// 敏感信息类别。每个类别有一个默认保密等级：等级越高，清洗得越多。
+/// Category of sensitive information. Each category has a default secrecy level: the higher the level, the more gets
+/// scrubbed.
 ///
-/// | 等级 | 含义 |
+/// | Level | Meaning |
 /// |---|---|
-/// | 1 | 凭据：口令、密钥、令牌、私钥、连接串 |
-/// | 2 | 身份：邮箱、电话、证件号、银行卡、车牌、SSH 公钥、经纬度 |
-/// | 3 | 网络与设备：IP、MAC、主机名、用户名、UUID、序列号、SSID、URL 主机 |
-/// | 4 | 偏执：硬件标识、User-Agent、整条 URL、长数字/十六进制/base64 串 |
-/// | 5 | 仅显式启用：时间戳 |
+/// | 1 | Credentials: passwords, keys, tokens, private keys, connection strings |
+/// | 2 | Identity: emails, phone numbers, ID numbers, bank cards, license plates, SSH public keys, coordinates |
+/// | 3 | Network and devices: IPs, MACs, hostnames, usernames, UUIDs, serial numbers, SSIDs, URL hosts |
+/// | 4 | Paranoid: hardware identifiers, User-Agent, whole URLs, long digit/hex/base64 strings |
+/// | 5 | Only when explicitly enabled: timestamps |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Category {
@@ -93,7 +94,7 @@ impl Category {
         self as usize
     }
 
-    /// 稳定的机器可读 id（用于命令行、配置文件、报告）。
+    /// Stable machine-readable id (used on the command line, in config files and in reports).
     pub fn id(self) -> &'static str {
         match self {
             Category::Password => "password",
@@ -130,7 +131,7 @@ impl Category {
         }
     }
 
-    /// 解析类别 id，大小写不敏感，`-` 与 `_` 等价。
+    /// Parses a category id, case-insensitively, treating `-` and `_` as equivalent.
     pub fn from_id(s: &str) -> Option<Category> {
         let norm = s.trim().to_ascii_lowercase().replace('-', "_");
         let alias = match norm.as_str() {
@@ -149,7 +150,7 @@ impl Category {
         alias.or_else(|| Category::ALL.into_iter().find(|c| c.id() == norm))
     }
 
-    /// 类别默认属于哪个保密等级。
+    /// The secrecy level this category belongs to by default.
     pub fn default_level(self) -> u8 {
         use Category::*;
         match self {
@@ -161,7 +162,7 @@ impl Category {
         }
     }
 
-    /// `tag` 打码模式使用的标签，如 `[IPV4]`。
+    /// Tag used by the `tag` mask mode, e.g. `[IPV4]`.
     pub fn tag(self) -> &'static str {
         use Category::*;
         match self {
@@ -199,7 +200,7 @@ impl Category {
         }
     }
 
-    /// 伪名前缀，如 `IP_k3f9xq2a`。
+    /// Pseudonym prefix, e.g. `IP_k3f9xq2a`.
     pub fn pseudo_prefix(self) -> &'static str {
         use Category::*;
         match self {
@@ -237,7 +238,7 @@ impl Category {
         }
     }
 
-    /// 界面上显示的名称（按当前语言）。
+    /// Display name in the UI (in the current language).
     pub fn label(self) -> String {
         crate::i18n::tr(&format!("category.{}", self.id()))
     }
@@ -249,7 +250,7 @@ impl std::fmt::Display for Category {
     }
 }
 
-/// 每个类别的命中计数。
+/// Hit count for each category.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Counts(pub [u64; Category::COUNT]);
 
