@@ -114,6 +114,7 @@ $ logblur -l 4 -m pseudo --salt s3 logs.tar.gz
 $ logblur logs.tar.gz -o clean.zip        # convert while scrubbing
 $ logblur /var/log --out-dir ~/shared     # a whole directory
 $ journalctl -b | logblur - > boot.txt    # standard input to standard output
+$ tail -f app.log | logblur --line-buffered -
 $ logblur logs.zip --report md            # also write a Markdown report
 $ logblur preview logs.zip -n 30          # look before you write anything
 $ logblur rules list --all                # every rule and category
@@ -122,6 +123,28 @@ $ logblur rules test "Accepted publickey for alice from 203.0.113.5"
 
 Run `logblur --help` for every option. Exit codes: `0` success, `1` usage or
 configuration error, `2` processing failed, `3` cancelled.
+
+
+### Live logs
+
+By default logblur reads all of standard input before it writes anything. With
+`--line-buffered` each line is written as soon as it has been scrubbed, so it
+can sit at the end of `tail -f`, `journalctl -f` or `kubectl logs -f`:
+
+```
+$ journalctl -f | logblur --line-buffered -
+```
+
+In this mode there is no learning pass and no report, and input is read as
+UTF-8. Multi-line private keys are still masked, line by line as they arrive.
+Lines that arrive together are scrubbed in parallel.
+
+When many programs produce logs at once, give each one its own logblur, or
+collect their logs first (journald, rsyslog) and scrub the collected stream. Do
+not let them all write into one pipe. Many programs write to a pipe in blocks
+rather than whole lines, and only writes of up to 4 KiB are kept in one piece,
+so lines from different programs can be spliced together, and a value split in
+two may not be recognized.
 
 
 ### Security levels

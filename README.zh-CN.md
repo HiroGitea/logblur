@@ -84,6 +84,7 @@ $ logblur -l 4 -m pseudo --salt s3 logs.tar.gz
 $ logblur logs.tar.gz -o clean.zip        # 脱敏的同时转换格式
 $ logblur /var/log --out-dir ~/shared     # 处理整个文件夹
 $ journalctl -b | logblur - > boot.txt    # 标准输入进，标准输出出
+$ tail -f app.log | logblur --line-buffered -
 $ logblur logs.zip --report md            # 顺便生成 Markdown 报告
 $ logblur preview logs.zip -n 30          # 先预览，不写任何文件
 $ logblur rules list --all                # 列出所有规则和类别
@@ -91,6 +92,19 @@ $ logblur rules test "Accepted publickey for alice from 203.0.113.5"
 ```
 
 完整选项见 `logblur --help`。退出码：`0` 成功，`1` 用法或配置错误，`2` 处理失败，`3` 已取消。
+
+
+### 实时日志
+
+默认情况下，logblur 会读完全部标准输入再统一输出。加上 `--line-buffered` 后，每行打完码立即输出，可以直接接在 `tail -f`、`journalctl -f`、`kubectl logs -f` 后面：
+
+```
+$ journalctl -f | logblur --line-buffered -
+```
+
+这个模式下没有学习阶段，也不生成报告，输入按 UTF-8 读取。跨多行的私钥照样会被打码，每到一行处理一行。同时到达的多行会并行处理。
+
+如果有很多程序同时产生日志，请给每个程序各接一个 logblur，或者先用 journald、rsyslog 把日志收集起来，再处理汇总后的流。不要让它们往同一个管道里写：很多程序往管道输出时是按块写、而不是按行写，而且只有不超过 4 KiB 的单次写入才保证不被打断，所以不同程序的行可能被拼接在一起，被拆成两半的值就可能认不出来。
 
 
 ### 安全级别

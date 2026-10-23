@@ -17,6 +17,7 @@ pub mod pipeline;
 pub mod report;
 pub mod rules;
 pub mod scan;
+pub mod stream;
 pub mod text;
 pub mod util;
 

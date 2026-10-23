@@ -115,6 +115,8 @@ struct ScrubArgs {
     dry_run: bool,
     #[arg(short, long, help = t!("cli.arg.quiet"))]
     quiet: bool,
+    #[arg(long, help = t!("cli.arg.line_buffered"))]
+    line_buffered: bool,
 }
 
 /// 规则与打码相关的选项（scrub、preview、rules test、bench 共用）。
@@ -495,12 +497,7 @@ fn print_summary(input: &str, r: &Report) {
             secs = format!("{:.2}", r.elapsed_ms as f64 / 1000.0)
         )
     );
-    let mut cats: Vec<(Category, u64)> = r.by_category.iter().collect();
-    cats.sort_by_key(|c| std::cmp::Reverse(c.1));
-    if !cats.is_empty() {
-        let list: Vec<String> = cats.iter().take(8).map(|(c, n)| format!("{} {n}", c.label())).collect();
-        eprintln!("{}", t!("cli.msg.top_categories", list = list.join(", ")));
-    }
+    print_top_categories(&r.by_category);
     let learned: usize = r.learned.values().sum();
     if learned > 0 {
         eprintln!("{}", t!("cli.msg.learned", n = learned));
@@ -510,6 +507,15 @@ fn print_summary(input: &str, r: &Report) {
     }
     if r.warnings.len() > 5 {
         eprintln!("{}", t!("cli.msg.more_warnings", n = r.warnings.len() - 5));
+    }
+}
+
+fn print_top_categories(counts: &Counts) {
+    let mut cats: Vec<(Category, u64)> = counts.iter().collect();
+    cats.sort_by_key(|c| std::cmp::Reverse(c.1));
+    if !cats.is_empty() {
+        let list: Vec<String> = cats.iter().take(8).map(|(c, n)| format!("{} {n}", c.label())).collect();
+        eprintln!("{}", t!("cli.msg.top_categories", list = list.join(", ")));
     }
 }
 
@@ -553,6 +559,9 @@ fn cmd_scrub(a: ScrubArgs) -> CliResult {
         std::fs::create_dir_all(dir).map_err(|e| usage(format!("{}: {e}", dir.display())))?;
     }
     let cfg = build_config(&a.opts)?;
+    if a.line_buffered {
+        return scrub_line_buffered(&a, &cfg);
+    }
     let cancel = install_ctrlc();
     let mut failures = 0usize;
     for input in &a.inputs {
@@ -593,6 +602,46 @@ fn cmd_scrub(a: ScrubArgs) -> CliResult {
         }
     }
     Ok(if failures > 0 { ExitCode::from(2) } else { ExitCode::SUCCESS })
+}
+
+/// `--line-buffered`：标准输入逐行打码，每批写完立即刷新。
+///
+/// 不装 Ctrl-C 处理器：流式模式本来就靠 Ctrl-C 结束，已写出的行都刷新过了，按默认方式退出（130）即可。
+fn scrub_line_buffered(a: &ScrubArgs, cfg: &JobConfig) -> CliResult {
+    let cancel = &CancelToken::new();
+    if a.inputs.len() != 1 || a.inputs[0].as_os_str() != "-" {
+        return Err(usage(t!("cli.msg.line_buffered_stdin")));
+    }
+    if a.out_dir.is_some() || a.output.as_ref().is_some_and(|o| o.as_os_str() != "-") {
+        return Err(usage(t!("cli.msg.line_buffered_output")));
+    }
+    if a.report.is_some() || a.report_path.is_some() {
+        return Err(usage(t!("cli.msg.line_buffered_report")));
+    }
+    let engine = Engine::new(cfg)?;
+    let result = if a.dry_run {
+        logblur_core::stream::scrub_lines(&engine, cfg, io::stdin(), io::sink(), cancel)
+    } else {
+        let out = io::BufWriter::with_capacity(1 << 16, io::stdout().lock());
+        logblur_core::stream::scrub_lines(&engine, cfg, io::stdin(), out, cancel)
+    };
+    let stats = match result {
+        Ok(s) => s,
+        // 下游提前关闭（例如接了 head）不算失败
+        Err(logblur_core::Error::Io { source, .. }) if source.kind() == io::ErrorKind::BrokenPipe => {
+            return Ok(ExitCode::SUCCESS);
+        }
+        Err(e) => {
+            eprintln!("{}", t!("cli.msg.failed", input = "-", err = e));
+            return Ok(ExitCode::from(2));
+        }
+    };
+    if !a.quiet {
+        let secs = format!("{:.2}", stats.elapsed.as_secs_f64());
+        eprintln!("{}", t!("cli.msg.line_summary", lines = stats.lines, matches = stats.counts.total(), secs = secs));
+        print_top_categories(&stats.counts);
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 // ───────────────────────── preview ─────────────────────────
