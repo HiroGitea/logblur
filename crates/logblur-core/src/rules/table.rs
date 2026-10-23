@@ -79,7 +79,7 @@ fn cli_value(c: &Cand) -> bool {
 /// All built-in rules.
 pub fn builtin() -> Vec<Rule> {
     vec![
-        // ───────────────────────── 1 凭据 ─────────────────────────
+        // ───────────────────────── 1 Credentials ─────────────────────────
         Rule::new(
             "pem_private_key",
             C::PrivateKey,
@@ -217,7 +217,7 @@ pub fn builtin() -> Vec<Rule> {
             "AccountKey / SharedAccessKey in Azure and ADO connection strings",
             r"(?i)(?:AccountKey|SharedAccessKey|SharedAccessSignature)=([^;\s\x22']+)",
         ),
-        // ───────────────────────── 2 身份 ─────────────────────────
+        // ───────────────────────── 2 Identity ─────────────────────────
         Rule::new(
             "email",
             C::Email,
@@ -350,7 +350,7 @@ pub fn builtin() -> Vec<Rule> {
             r"(?i)(?:^|[^A-Za-z0-9])(?:imei|imeisv|meid|imsi|iccid)[\x22']?[ \t]*[:=：#]?[ \t]*[\x22']?([0-9A-Fa-f]{14,22})",
         )
         .after(v::after_not_alnum),
-        // ───────────────────────── 3 网络与设备 ─────────────────────────
+        // ───────────────────────── 3 Network and devices ─────────────────────────
         Rule::new(
             "ipv4",
             C::Ipv4,
@@ -446,7 +446,8 @@ pub fn builtin() -> Vec<Rule> {
                 r"|cl|mx|ca|us|eu|asia|io|ai|cloud|xyz|top|online|site|tech|store|shop|dev|page|blog|wiki|club|vip",
                 r"|ltd|group|work|space|live|news|fun|today|world|email|website|systems|solutions|services|company",
                 r"|center|digital|global|zone|one|lan|local|internal|intranet|corp|home|private|localnet|arpa",
-                // 词边界逼正则引擎在 int/internal、de/dev、cl/cloud 这类前缀冲突时继续尝试更长的 TLD
+                // The word boundary makes the regex engine keep trying longer TLDs on prefix clashes
+                // such as int/internal, de/dev and cl/cloud
                 r"))(?-u:\b)"
             ),
         )
@@ -643,7 +644,7 @@ pub fn builtin() -> Vec<Rule> {
             r"(?i)(?:^|[^A-Za-z0-9])e?ssid(?:[ \t]*[:：][ \t]*|[ \t]+=[ \t]+|=)([^\s\x22',;]+)",
         )
         .check(v::ssid),
-        // ───────────────────────── 4 偏执 ─────────────────────────
+        // ───────────────────────── 4 Paranoid ─────────────────────────
         Rule::new(
             "url_full",
             C::Url,
@@ -721,7 +722,7 @@ pub fn builtin() -> Vec<Rule> {
         .after(v::after_not_word)
         .check(not_abs_path_and_entropy)
         .protect(),
-        // ───────────────────────── 5 仅显式启用 ─────────────────────────
+        // ───────────────────────── 5 Only when explicitly enabled ─────────────────────────
         Rule::new(
             "ts_iso",
             C::Timestamp,

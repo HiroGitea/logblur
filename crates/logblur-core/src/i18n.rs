@@ -83,7 +83,7 @@ fn external_dirs() -> Vec<PathBuf> {
 
 fn load_all() -> Vec<Catalog> {
     let mut cats: Vec<Catalog> = BUILTIN.iter().filter_map(|(tag, text)| parse_catalog(tag, text)).collect();
-    // 低优先级的目录先加载，高优先级的后加载覆盖
+    // Load lower-priority directories first so higher-priority ones override them
     for dir in external_dirs().into_iter().rev() {
         let Ok(rd) = std::fs::read_dir(&dir) else { continue };
         let mut files: Vec<PathBuf> =
@@ -123,7 +123,7 @@ fn find(cats: &[Catalog], raw: &str) -> Option<usize> {
     if let Some(i) = cats.iter().position(|c| c.tag.to_ascii_lowercase() == want) {
         return Some(i);
     }
-    // 只有主语言相同也算（zh-TW、zh-Hans → zh-CN；en-GB → en）
+    // A matching primary language is also accepted (zh-TW, zh-Hans → zh-CN; en-GB → en)
     let primary = want.split('-').next().unwrap_or(&want).to_string();
     cats.iter().position(|c| c.tag.to_ascii_lowercase().split('-').next() == Some(primary.as_str()))
 }
@@ -169,7 +169,7 @@ fn state() -> Arc<State> {
         return s.clone();
     }
     init(None, None);
-    STATE.read().unwrap_or_else(|e| e.into_inner()).as_ref().cloned().expect("i18n 已初始化")
+    STATE.read().unwrap_or_else(|e| e.into_inner()).as_ref().cloned().expect("i18n is initialized")
 }
 
 /// Switches the language; returns false if the language is not available.
@@ -268,8 +268,8 @@ mod tests {
     use std::collections::BTreeSet;
 
     fn builtin(tag: &str) -> Catalog {
-        let (t, text) = BUILTIN.iter().find(|(t, _)| *t == tag).expect("内置语言");
-        parse_catalog(t, text).unwrap_or_else(|| panic!("{tag} 语言文件无法解析"))
+        let (t, text) = BUILTIN.iter().find(|(t, _)| *t == tag).expect("built-in language");
+        parse_catalog(t, text).unwrap_or_else(|| panic!("{tag} language file failed to parse"))
     }
 
     #[test]
@@ -280,15 +280,15 @@ mod tests {
         let zh_keys: BTreeSet<_> = zh.map.keys().filter(|k| !k.starts_with("rule.")).collect();
         let missing: Vec<_> = en_keys.difference(&zh_keys).collect();
         let extra: Vec<_> = zh_keys.difference(&en_keys).collect();
-        assert!(missing.is_empty(), "zh-CN 缺少: {missing:?}");
-        assert!(extra.is_empty(), "zh-CN 多出: {extra:?}");
+        assert!(missing.is_empty(), "zh-CN is missing: {missing:?}");
+        assert!(extra.is_empty(), "zh-CN has extra: {extra:?}");
     }
 
     #[test]
     fn every_rule_has_chinese_description() {
         let zh = builtin("zh-CN");
         for r in crate::rules::table::builtin() {
-            assert!(zh.map.contains_key(&format!("rule.{}", r.id)), "zh-CN 缺少 rule.{}", r.id);
+            assert!(zh.map.contains_key(&format!("rule.{}", r.id)), "zh-CN is missing rule.{}", r.id);
         }
     }
 
@@ -296,8 +296,8 @@ mod tests {
     fn config_templates_parse() {
         for tag in ["en", "zh-CN"] {
             let c = builtin(tag);
-            let tpl = c.map.get("config.template").expect("模板");
-            let fc: crate::config::FileConfig = toml::from_str(tpl).unwrap_or_else(|e| panic!("{tag} 模板: {e}"));
+            let tpl = c.map.get("config.template").expect("template");
+            let fc: crate::config::FileConfig = toml::from_str(tpl).unwrap_or_else(|e| panic!("{tag} template: {e}"));
             let mut cfg = crate::config::JobConfig::default();
             cfg.apply(fc).unwrap();
             cfg.validate().unwrap();

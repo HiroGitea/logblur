@@ -1,5 +1,6 @@
-# release-plz：合并到 main 后自动开「版本号 + CHANGELOG」PR，合并该 PR 即发布。
-# 三个 crate 共用一个版本；只给 logblur 打 tag、发 GitHub Release，CHANGELOG 汇总三个 crate 的改动。
+# release-plz: after a merge to main it opens a "version bump + CHANGELOG" PR; merging that PR publishes the release.
+# All three crates share one version; only logblur gets a tag and a GitHub Release, and its CHANGELOG covers
+# changes in all three crates.
 
 [workspace]
 release_always = false

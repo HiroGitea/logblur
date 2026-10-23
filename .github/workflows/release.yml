@@ -1,6 +1,6 @@
 name: Release
 
-# release-plz 发布后由 release-plz.yml 调用；手动推 v* tag 也会触发
+# Called by release-plz.yml after release-plz publishes; manually pushing a v* tag also triggers it
 on:
   push:
     tags: ['v*']

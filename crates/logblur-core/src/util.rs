@@ -138,7 +138,7 @@ pub fn civil_from_unix(secs: i64) -> (i32, u8, u8, u8, u8, u8) {
     let days = secs.div_euclid(86_400);
     let rem = secs.rem_euclid(86_400);
     let (h, m, s) = ((rem / 3600) as u8, ((rem % 3600) / 60) as u8, (rem % 60) as u8);
-    // Howard Hinnant 的 civil_from_days 算法
+    // Howard Hinnant's civil_from_days algorithm
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);

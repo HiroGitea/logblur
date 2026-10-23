@@ -163,7 +163,7 @@ pub fn run(spec: &JobSpec, cfg: &JobConfig, progress: &dyn ProgressSink, cancel:
     let plan = pipeline::plan(cfg, engine.masker().needs_sequential());
     let mut warnings = Vec::new();
 
-    // 第一遍：学习
+    // Pass 1: learn
     let learned_on = cfg.learn && r.input_kind.rereadable() && engine.has_learn_rules();
     if learned_on {
         let mut src = open_source(input_path, r.input_kind)?;
@@ -181,7 +181,7 @@ pub fn run(spec: &JobSpec, cfg: &JobConfig, progress: &dyn ProgressSink, cancel:
         engine.set_learned(set)?;
     }
 
-    // 第二遍：清洗
+    // Pass 2: scrub
     let mut src = open_source(input_path, r.input_kind)?;
     progress.event(ProgressEvent::Phase {
         phase: Phase::Scrub,

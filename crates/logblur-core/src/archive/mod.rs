@@ -380,7 +380,7 @@ impl Source for TarSource {
     }
 }
 
-// ───────────────────────── 单文件 / .gz / stdin ─────────────────────────
+// ───────────────────────── Single file / .gz / stdin ─────────────────────────
 
 pub struct SingleSource {
     name: String,
@@ -462,7 +462,7 @@ impl Source for SingleSource {
     }
 }
 
-// ───────────────────────── 文件夹 ─────────────────────────
+// ───────────────────────── Folder ─────────────────────────
 
 pub struct DirSource {
     root: PathBuf,
@@ -496,7 +496,7 @@ impl DirSource {
                     entries.push((path, name));
                 }
             }
-            // 保持字典序：逆序压栈
+            // Keep lexicographic order: push onto the stack in reverse
             for s in subdirs.into_iter().rev() {
                 stack.push(s);
             }

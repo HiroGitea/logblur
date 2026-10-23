@@ -1,4 +1,4 @@
-//! logblur 图形界面：把日志压缩包拖进窗口，得到清洗后的压缩包。
+//! logblur GUI: drop a log archive onto the window and get a scrubbed archive back.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod app;
@@ -6,7 +6,7 @@ mod app;
 use eframe::egui;
 
 fn main() -> eframe::Result {
-    // LOGBLUR_LANG / LANGUAGE / LC_ALL / LANG 优先，其次是系统区域设置
+    // LOGBLUR_LANG / LANGUAGE / LC_ALL / LANG take precedence, then the system locale
     logblur_core::i18n::init(None, sys_locale::get_locale().as_deref());
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

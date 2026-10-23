@@ -1,4 +1,4 @@
-//! 界面状态与绘制。清洗在后台线程进行，进度通过通道回到界面。
+//! UI state and drawing. Scrubbing runs on a background thread and reports progress back to the UI over a channel.
 
 use std::collections::{BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ use logblur_core::{
     Phase, ProgressEvent, Report, ReportFormat, i18n, t,
 };
 
-// ───────────────────────── 设置 ─────────────────────────
+// ───────────────────────── Settings ─────────────────────────
 
 struct Settings {
     level: u8,
@@ -73,7 +73,7 @@ fn lines(s: &str) -> Vec<String> {
 }
 
 impl Settings {
-    /// 只含等级与类别开关的配置，用来决定复选框的状态。
+    /// A config holding only the level and category switches, used to decide checkbox states.
     fn category_view(&self) -> JobConfig {
         JobConfig {
             level: self.level,
@@ -121,7 +121,7 @@ impl Settings {
     }
 }
 
-// ───────────────────────── 任务 ─────────────────────────
+// ───────────────────────── Jobs ─────────────────────────
 
 struct Running {
     input: PathBuf,
@@ -160,7 +160,7 @@ fn tail(s: &str, n: usize) -> String {
     if count <= n { s.to_string() } else { format!("…{}", s.chars().skip(count - n + 1).collect::<String>()) }
 }
 
-/// 输出已存在时换一个名字：`logs.blurred.zip` → `logs.blurred-2.zip`。
+/// Picks another name when the output already exists: `logs.blurred.zip` → `logs.blurred-2.zip`.
 fn unique(p: PathBuf) -> PathBuf {
     let taken = |p: &Path| p.exists() || part_path(p).exists();
     if !taken(&p) {
@@ -181,7 +181,7 @@ fn unique(p: PathBuf) -> PathBuf {
     p
 }
 
-// ───────────────────────── 应用 ─────────────────────────
+// ───────────────────────── App ─────────────────────────
 
 pub struct App {
     s: Settings,
@@ -314,7 +314,7 @@ impl App {
         });
     }
 
-    // ───────────────────────── 绘制 ─────────────────────────
+    // ───────────────────────── Drawing ─────────────────────────
 
     fn header_ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
@@ -688,7 +688,7 @@ impl eframe::App for App {
     }
 }
 
-/// 让 `DroppedFile` 的导入不被视为未使用（`path()` 是它的方法）。
+/// Keeps the `DroppedFile` import from being reported as unused (`path()` is one of its methods).
 #[allow(dead_code)]
 fn _dropped_path(f: &dyn DroppedFile) -> &Path {
     f.path()

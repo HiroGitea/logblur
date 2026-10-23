@@ -188,7 +188,7 @@ pub fn detect(sample: &[u8], name: &str, complete: bool) -> TextKind {
     if !probe.is_empty() && control * 20 > probe.len() {
         return TextKind::Binary(BinaryKind::Control);
     }
-    // UTF-8？不完整的样本允许末尾截断一个字符。
+    // UTF-8? An incomplete sample may have one character truncated at the end.
     match std::str::from_utf8(sample) {
         Ok(_) => return TextKind::Utf8 { bom: false },
         Err(e) if e.error_len().is_none() && !complete => return TextKind::Utf8 { bom: false },
@@ -202,7 +202,7 @@ pub fn detect(sample: &[u8], name: &str, complete: bool) -> TextKind {
         return TextKind::Legacy { enc: guess, bom_len: 0 };
     }
     if invalid * 200 <= sample.len() {
-        // 基本是 UTF-8，夹杂个别坏字节
+        // Mostly UTF-8 with a few bad bytes
         return TextKind::Utf8 { bom: false };
     }
     TextKind::Legacy { enc: guess, bom_len: 0 }
@@ -319,8 +319,8 @@ mod tests {
         let text = "2026-10-23 用户张三登录失败，密码错误，来源 192.0.2.10，手机号 13800138000\n".repeat(20);
         let (gbk, _, _) = encoding_rs::GBK.encode(&text);
         let kind = detect(&gbk, "app.log", true);
-        let TextKind::Legacy { enc, .. } = kind else { panic!("应识别为 GBK: {kind:?}") };
-        let s = decode_strict(&gbk, enc).expect("可以解码");
+        let TextKind::Legacy { enc, .. } = kind else { panic!("should be detected as GBK: {kind:?}") };
+        let s = decode_strict(&gbk, enc).expect("decodes");
         assert_eq!(s, text);
         assert_eq!(encode(&s, enc), gbk.into_owned());
     }

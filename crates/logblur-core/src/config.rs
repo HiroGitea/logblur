@@ -284,7 +284,7 @@ impl JobConfig {
         if !self.category_enabled(c) {
             return false;
         }
-        // 显式点名的类别：至少启用到该类别的默认等级。
+        // Explicitly named categories are enabled at least up to the category's default level.
         let forced = self.only.contains(&c) || self.enable.contains(&c);
         let effective = if forced { self.level.max(c.default_level()) } else { self.level };
         rule_level <= effective
@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn template_parses() {
-        let fc: FileConfig = toml::from_str(&config_template()).expect("模板应能解析");
+        let fc: FileConfig = toml::from_str(&config_template()).expect("template should parse");
         let mut cfg = JobConfig::default();
         cfg.apply(fc).unwrap();
         cfg.validate().unwrap();

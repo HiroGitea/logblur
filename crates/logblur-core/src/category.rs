@@ -13,12 +13,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Category {
-    // 1 凭据
+    // 1 Credentials
     Password,
     ApiKey,
     Token,
     PrivateKey,
-    // 2 身份
+    // 2 Identity
     Email,
     Phone,
     IdCard,
@@ -29,7 +29,7 @@ pub enum Category {
     SshKey,
     GeoCoord,
     Imei,
-    // 3 网络与设备
+    // 3 Network and devices
     Ipv4,
     Ipv6,
     Mac,
@@ -39,16 +39,16 @@ pub enum Category {
     MachineId,
     Serial,
     WifiSsid,
-    // 4 偏执
+    // 4 Paranoid
     Url,
     UserAgent,
     HardwareId,
     LongNumber,
     HexString,
     Base64,
-    // 5 仅显式启用
+    // 5 Only when explicitly enabled
     Timestamp,
-    // 用户自定义
+    // User-defined
     Custom,
 }
 
@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn all_is_complete_and_indexed() {
         for (i, c) in Category::ALL.iter().enumerate() {
-            assert_eq!(c.index(), i, "{c:?} 的序号与 ALL 中的位置不一致");
+            assert_eq!(c.index(), i, "index of {c:?} does not match its position in ALL");
             assert_eq!(Category::from_id(c.id()), Some(*c));
         }
     }
