@@ -104,8 +104,8 @@ kept = ["Linux version 6.1.0-13-amd64", "gcc-12", "12.2.0-14"]
 [[case]]
 name = "nginx access log"
 level = 3
-input = "203.0.113.9 - bob [23/Oct/2026:11:12:13 +0800] \"GET /api/v1/orders?token=9f8e7d6c5b4a39281706&page=2 HTTP/1.1\" 200 512 \"https://shop.acme-corp.cn/cart\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36\""
-masked = ["203.0.113.9", "9f8e7d6c5b4a39281706", "shop.acme-corp.cn"]
+input = "203.0.113.9 - bob [23/Oct/2026:11:12:13 +0800] \"GET /api/v1/orders?token=9f8e7d6c5b4a39281706&page=2 HTTP/1.1\" 200 512 \"https://shop.acme-corp.internal/cart\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36\""
+masked = ["203.0.113.9", "9f8e7d6c5b4a39281706", "shop.acme-corp.internal"]
 kept = ["GET /api/v1/orders?token=", "page=2", "Mozilla/5.0 (X11; Linux x86_64)", "/cart"]
 
 [[case]]
@@ -148,8 +148,8 @@ tags = ["PRIVATE_KEY"]
 [[case]]
 name = "chinese personal data"
 level = 2
-input = "用户 张三 手机号：13800138000，身份证 11010519491231002X，邮箱 zhangsan@acme-corp.cn，车牌 京A12345，银行卡 6222 0212 3456 7894"
-masked = ["13800138000", "11010519491231002X", "zhangsan@acme-corp.cn", "京A12345", "6222 0212 3456 7894"]
+input = "用户 张三 手机号：13800138000，身份证 11010519491231002X，邮箱 zhangsan@acme-corp.internal，车牌 京A12345，银行卡 6222 0212 3456 7894"
+masked = ["13800138000", "11010519491231002X", "zhangsan@acme-corp.internal", "京A12345", "6222 0212 3456 7894"]
 kept = ["手机号：", "身份证", "邮箱", "车牌", "银行卡"]
 tags = ["PHONE", "ID_CARD", "EMAIL", "PLATE", "BANK_CARD"]
 
@@ -227,15 +227,15 @@ kept = ["CMD (", "/backup.sh", "UID=1003", "shell=/bin/bash"]
 [[case]]
 name = "command-line secrets"
 level = 1
-input = "bash[999]: mysql -u root -pHunter2Secret -h db.acme-corp.cn; curl --password hunter3 https://api.acme-corp.cn/v1"
+input = "bash[999]: mysql -u root -pHunter2Secret -h db.acme-corp.internal; curl --password hunter3 https://api.acme-corp.internal/v1"
 masked = ["Hunter2Secret", "hunter3"]
-kept = ["mysql -u root -p", "curl --password ", "db.acme-corp.cn"]
+kept = ["mysql -u root -p", "curl --password ", "db.acme-corp.internal"]
 
 [[case]]
 name = "command-line hosts at level 3"
 level = 3
-input = "bash[999]: mysql -u root -h db.acme-corp.cn; curl https://api.acme-corp.cn/v1"
-masked = ["db.acme-corp.cn", "api.acme-corp.cn"]
+input = "bash[999]: mysql -u root -h db.acme-corp.internal; curl https://api.acme-corp.internal/v1"
+masked = ["db.acme-corp.internal", "api.acme-corp.internal"]
 kept = ["mysql -u root -h ", "/v1"]
 
 [[case]]
@@ -267,8 +267,8 @@ kept = ["********", "token=null", "${VAULT_SECRET}"]
 [[case]]
 name = "level 1 keeps identity data"
 level = 1
-input = "login from 203.0.113.5 by ops@acme-corp.cn"
-kept = ["203.0.113.5", "ops@acme-corp.cn"]
+input = "login from 203.0.113.5 by ops@acme-corp.internal"
+kept = ["203.0.113.5", "ops@acme-corp.internal"]
 
 [[case]]
 name = "cookies"
@@ -301,8 +301,8 @@ kept = ["exp 12/29"]
 [[case]]
 name = "hostname kv and rhost"
 level = 3
-input = "pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=client7.acme-corp.cn  user=alice"
-masked = ["client7.acme-corp.cn", "alice"]
+input = "pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=client7.acme-corp.internal  user=alice"
+masked = ["client7.acme-corp.internal", "alice"]
 kept = ["authentication failure; logname= uid=0"]
 
 [[case]]
@@ -317,7 +317,14 @@ tags = ["REDACTED"]
 [[case]]
 name = "allow list"
 level = 3
-allow = ["203.0.113.0/24", "*.acme-corp.cn"]
-input = "peer 203.0.113.9 via gw.acme-corp.cn and 198.51.100.4"
+allow = ["203.0.113.0/24", "*.acme-corp.internal"]
+input = "peer 203.0.113.9 via gw.acme-corp.internal and 198.51.100.4"
 masked = ["198.51.100.4"]
-kept = ["203.0.113.9", "gw.acme-corp.cn"]
+kept = ["203.0.113.9", "gw.acme-corp.internal"]
+
+[[case]]
+name = "TLDs that share a prefix with a shorter TLD"
+level = 3
+input = "peers: a.acme-corp.dev b.acme-corp.cloud c.acme-corp.company d.acme-corp.group e.acme-corp.services f.acme-corp.intranet g.acme-corp.localnet h.acme-corp.mobi"
+masked = ["a.acme-corp.dev", "b.acme-corp.cloud", "c.acme-corp.company", "d.acme-corp.group", "e.acme-corp.services", "f.acme-corp.intranet", "g.acme-corp.localnet", "h.acme-corp.mobi"]
+kept = ["peers: "]

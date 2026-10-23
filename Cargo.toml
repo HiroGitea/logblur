@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
-members = ["crates/logblur-core", "crates/logblur-cli", "crates/logblur-gui"]
-default-members = ["crates/logblur-core", "crates/logblur-cli"]
+members = ["crates/logblur-core", "crates/logblur", "crates/logblur-gui"]
+default-members = ["crates/logblur-core", "crates/logblur"]
 
 [workspace.package]
 version = "0.1.0"

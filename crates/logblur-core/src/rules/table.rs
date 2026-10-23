@@ -404,7 +404,8 @@ pub fn builtin() -> Vec<Rule> {
                 r"|cl|mx|ca|us|eu|asia|io|ai|cloud|xyz|top|online|site|tech|store|shop|dev|page|blog|wiki|club|vip",
                 r"|ltd|group|work|space|live|news|fun|today|world|email|website|systems|solutions|services|company",
                 r"|center|digital|global|zone|one|lan|local|internal|intranet|corp|home|private|localnet|arpa",
-                r"))"
+                // 词边界逼正则引擎在 int/internal、de/dev、cl/cloud 这类前缀冲突时继续尝试更长的 TLD
+                r"))(?-u:\b)"
             ),
         )
         .after(v::after_host)

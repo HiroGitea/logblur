@@ -799,7 +799,7 @@ fn synth_block(target: usize) -> Vec<u8> {
             1 => format!("Oct 23 11:00:00 web-{n:03} sshd[{i}]: Accepted publickey for alice{n} from 198.51.100.{n} port 50122 ssh2: ED25519 SHA256:Hx2b1QKcOoa1L3dHmC7yJ4z5eQ8mN0pR6sT9uV2wX3Y\n"),
             2 => format!("Oct 23 11:00:01 web-{n:03} kernel: [{i}.123456] IN=eth0 OUT= MAC=ff:ff:ff:ff:ff:ff:52:54:00:12:34:{:02x}:08:00 SRC=192.0.2.{n} DST=192.0.2.255 LEN=78 PROTO=UDP\n", n % 256),
             3 => format!("Oct 23 11:00:02 web-{n:03} systemd[1]: Started session-{i}.scope - Session {i} of User bob{n}.\n"),
-            4 => format!("2026-10-23T11:00:03Z app[{i}] INFO request id={i} user=carol{n}@acme-corp.cn token=9f8e7d6c5b4a3928{n:04} took 12ms\n"),
+            4 => format!("2026-10-23T11:00:03Z app[{i}] INFO request id={i} user=carol{n}@acme-corp.internal token=9f8e7d6c5b4a3928{n:04} took 12ms\n"),
             5 => format!("Oct 23 11:00:04 web-{n:03} dhclient[612]: DHCPACK of 10.0.{n}.23 from 10.0.{n}.1 (xid=0x5a3c2e1f)\n"),
             6 => format!("Oct 23 11:00:05 web-{n:03} nginx[1200]: 203.0.113.{n} - - \"GET /api/v1/items?page={n} HTTP/1.1\" 200 512 \"-\" \"curl/8.5.0\"\n"),
             _ => format!("Oct 23 11:00:06 web-{n:03} kernel: [{i}.000001] EXT4-fs (sda2): mounted filesystem with ordered data mode. Quota mode: none.\n"),

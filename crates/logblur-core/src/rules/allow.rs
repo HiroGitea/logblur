@@ -259,9 +259,9 @@ mod tests {
         assert!(a.allowed(Category::Mac, "01:00:5e:00:00:fb"));
         assert!(!a.allowed(Category::Mac, "52:54:00:12:34:56"));
         assert!(a.allowed(Category::Email, "nobody@example.com"));
-        assert!(!a.allowed(Category::Email, "alice@acme-corp.cn"));
+        assert!(!a.allowed(Category::Email, "alice@acme-corp.internal"));
         assert!(a.allowed(Category::Hostname, "deb.debian.org"));
-        assert!(!a.allowed(Category::Hostname, "nas.acme-corp.cn"));
+        assert!(!a.allowed(Category::Hostname, "nas.acme-corp.internal"));
         assert!(a.allowed(Category::Username, "root"));
         assert!(!a.allowed(Category::Username, "alice"));
     }
