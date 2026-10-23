@@ -212,7 +212,10 @@ enum ChunkMode {
     Copy,
 }
 
-#[expect(clippy::large_enum_variant, reason = "Job 只在通道里移动，几百字节的拷贝相对处理数据可以忽略")]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "a Job only moves through channels; copying a few hundred bytes is negligible next to the work"
+)]
 enum Job {
     Whole {
         seq: u64,
@@ -290,7 +293,7 @@ fn gunzip_prefix(head: &[u8]) -> Vec<u8> {
     out
 }
 
-// ───────────────────────── 读线程 ─────────────────────────
+// ───────────────────────── Reader thread ─────────────────────────
 
 fn reader(ctx: &Ctx, src: &mut dyn Source, jobs: &Sender<Job>, out: &Sender<Piece>) -> Result<()> {
     let mut seq = 0u64;
@@ -315,7 +318,7 @@ fn entry(
 ) -> Result<()> {
     let learn = ctx.learning();
     if learn {
-        // 文件名里也有用户名、主机名
+        // File names contain usernames and hostnames too
         let mut set = HashSet::new();
         ctx.engine.learn(format!("/{}", meta.name).as_bytes(), &mut set);
         if !set.is_empty() {
@@ -399,7 +402,7 @@ fn file_entry(
     let mut head = Vec::new();
     let eof = read_up_to(rd, &mut head, SAMPLE_LEN).ctx(|| crate::t!("io.read", path = meta.name))?;
 
-    // 日志轮转产生的 .gz：解压、清洗、再压回去
+    // .gz from log rotation: decompress, scrub, recompress
     if head.starts_with(&[0x1f, 0x8b]) && is_nested_gz_name(&meta.name) {
         let inner_name = meta.name[..meta.name.len() - 3].to_string();
         let peek = gunzip_prefix(&head);
@@ -567,7 +570,7 @@ fn stream_entry(
     }
 }
 
-// ───────────────────────── 工作线程 ─────────────────────────
+// ───────────────────────── Worker threads ─────────────────────────
 
 /// Scrubs a chunk of UTF-8 / decoded text and encodes it back to the original encoding if needed.
 fn scrub_text(ctx: &Ctx, data: &[u8], kind: TextKind, mask: char, counts: &mut Counts) -> (Vec<u8>, Option<String>) {
@@ -651,7 +654,7 @@ fn process(ctx: &Ctx, job: Job, out: &Sender<Piece>) -> Result<()> {
             if ctx.learning() {
                 let kind = match mode {
                     ChunkMode::Copy => TextKind::Binary(text::BinaryKind::Nul),
-                    // 已经是 UTF-8
+                    // Already UTF-8
                     ChunkMode::Utf8 | ChunkMode::Legacy(_) => TextKind::Utf8 { bom: false },
                 };
                 let v = learn_text(ctx, &data, kind);
@@ -700,7 +703,7 @@ fn worker(ctx: &Ctx, rx: Receiver<Job>, out: Sender<Piece>) {
     }
 }
 
-// ───────────────────────── 写线程 ─────────────────────────
+// ───────────────────────── Writer thread ─────────────────────────
 
 struct Stream {
     gz: Option<GzEncoder<Vec<u8>>>,
@@ -830,7 +833,7 @@ fn learn_collector(ctx: &Ctx, rx: Receiver<Piece>) -> HashSet<(Category, String)
     set
 }
 
-// ───────────────────────── 入口 ─────────────────────────
+// ───────────────────────── Entry point ─────────────────────────
 
 /// Second pass: scrubs and writes output. Returns the entry reports and the sink (the caller calls finish / abort).
 pub fn scrub_pass(

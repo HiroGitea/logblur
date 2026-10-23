@@ -22,7 +22,7 @@ crossbeam-channel = "0.5.17"
 [profile.dev]
 debug = "line-tables-only"
 
-# 依赖用优化编译：正则在 debug 构建下也要够快，测试才不会慢。
+# Build dependencies with optimizations: regexes must be fast even in debug builds so tests stay quick.
 [profile.dev.package."*"]
 opt-level = 2
 

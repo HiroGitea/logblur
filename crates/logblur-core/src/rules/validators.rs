@@ -4,7 +4,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use super::Cand;
 
-// ───────────────────────── 尾部边界 ─────────────────────────
+// ───────────────────────── Trailing boundary ─────────────────────────
 
 #[inline]
 fn first(rest: &[u8]) -> Option<u8> {
@@ -80,7 +80,7 @@ pub fn after_email(rest: &[u8]) -> bool {
     after_host(rest)
 }
 
-// ───────────────────────── 通用 ─────────────────────────
+// ───────────────────────── General ─────────────────────────
 
 fn is_placeholder(v: &str) -> bool {
     let t = v.trim_matches(|c: char| c == '"' || c == '\'' || c == '`');
@@ -136,11 +136,11 @@ fn is_placeholder(v: &str) -> bool {
     if WORDS.contains(&lower.as_str()) {
         return true;
     }
-    // 已经打过码的
+    // Already masked
     if t.chars().all(|c| matches!(c, '*' | '░' | '▒' | '▓' | '█' | 'x' | 'X' | '#' | '•' | '·')) {
         return true;
     }
-    // 模板变量
+    // Template variables
     t.starts_with("${")
         || t.starts_with("{{")
         || t.starts_with("%(")
@@ -153,7 +153,7 @@ pub fn secret_value(c: &Cand) -> bool {
     if is_placeholder(c.payload) {
         return false;
     }
-    // sudo 日志的 PWD=/home/x 是工作目录，不是口令
+    // PWD=/home/x in sudo logs is the working directory, not a password
     if c.payload.starts_with('/') && c.whole.contains("PWD=") {
         return false;
     }
@@ -277,7 +277,7 @@ pub fn ipv6(c: &Cand) -> bool {
     if addr.matches(':').count() < 2 {
         return false;
     }
-    // 纯十进制数字加冒号（如 12:34:56 时间）不算
+    // Plain decimal digits and colons (e.g. a 12:34:56 time) don't count
     if addr.bytes().all(|b| b.is_ascii_digit() || b == b':') && !addr.contains("::") {
         return false;
     }
@@ -512,7 +512,7 @@ pub fn hostname(c: &Cand) -> bool {
     if labels.iter().any(|l| l.is_empty() || l.len() > 63 || l.starts_with('-') || l.ends_with('-')) {
         return false;
     }
-    // 至少有一个非 TLD 标签含字母（排除纯数字/IP 形状）
+    // At least one non-TLD label contains a letter (rules out all-digit / IP-like shapes)
     labels[..labels.len() - 1].iter().any(|l| l.bytes().any(|b| b.is_ascii_alphabetic()))
 }
 

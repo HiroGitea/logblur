@@ -1,4 +1,4 @@
-//! logblur 命令行：清洗 Linux 日志压缩包里的敏感信息。
+//! logblur CLI: scrubs sensitive information from Linux log archives.
 
 use std::io::{self, IsTerminal, Read};
 use std::path::{Path, PathBuf};
@@ -18,7 +18,7 @@ use logblur_core::{
     Phase, ProgressEvent, ProgressSink, Report, ReportFormat, i18n, t,
 };
 
-// ───────────────────────── 命令行定义 ─────────────────────────
+// ───────────────────────── Command-line definition ─────────────────────────
 
 #[derive(Parser, Debug)]
 #[command(
@@ -36,7 +36,7 @@ struct Cli {
     #[command(flatten)]
     scrub: ScrubArgs,
 
-    // 在解析前预先读取（见 prescan_lang），这里声明是为了出现在帮助里。
+    // Read ahead of parsing (see prescan_lang); declared here so it shows up in the help.
     #[arg(long, global = true, value_name = "LANG", help = t!("cli.arg.lang"))]
     lang: Option<String>,
 }
@@ -64,7 +64,7 @@ enum Command {
 }
 
 #[derive(Subcommand, Debug)]
-#[expect(clippy::large_enum_variant, reason = "命令行只解析一次")]
+#[expect(clippy::large_enum_variant, reason = "the command line is parsed only once")]
 enum RulesCmd {
     #[command(about = t!("cli.cmd.rules_list"))]
     List {
@@ -119,7 +119,7 @@ struct ScrubArgs {
     line_buffered: bool,
 }
 
-/// 规则与打码相关的选项（scrub、preview、rules test、bench 共用）。
+/// Rule and masking options (shared by scrub, preview, rules test and bench).
 #[derive(Args, Debug, Clone, Default)]
 struct RuleOpts {
     #[arg(short = 'c', long, value_name = "FILE", help = t!("cli.arg.config"))]
@@ -202,9 +202,9 @@ enum EncodingArg {
     Utf8,
 }
 
-// ───────────────────────── 错误与退出码 ─────────────────────────
+// ───────────────────────── Errors and exit codes ─────────────────────────
 
-/// 退出码：0 成功，1 用法/配置错误，2 处理失败，3 已取消。
+/// Exit codes: 0 success, 1 usage/config error, 2 processing failure, 3 cancelled.
 struct CliError {
     msg: String,
     code: u8,
@@ -233,9 +233,9 @@ impl From<logblur_core::Error> for CliError {
 
 type CliResult<T = ExitCode> = Result<T, CliError>;
 
-// ───────────────────────── 入口 ─────────────────────────
+// ───────────────────────── Entry point ─────────────────────────
 
-/// clap 解析之前先找 `--lang`，这样帮助文本也能用指定的语言。
+/// Looks for `--lang` before clap parses, so the help text also uses the chosen language.
 fn prescan_lang() -> Option<String> {
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -282,9 +282,9 @@ fn main() -> ExitCode {
     }
 }
 
-// ───────────────────────── 配置 ─────────────────────────
+// ───────────────────────── Config ─────────────────────────
 
-/// `--allow @file` / `--deny @file`：每行一项，忽略空行和 # 注释。
+/// `--allow @file` / `--deny @file`: one entry per line; blank lines and # comments are ignored.
 fn expand_list(items: &[String]) -> CliResult<Vec<String>> {
     let mut out = Vec::new();
     for item in items {
@@ -374,7 +374,7 @@ fn build_config(o: &RuleOpts) -> CliResult<JobConfig> {
     Ok(cfg)
 }
 
-// ───────────────────────── 进度条 ─────────────────────────
+// ───────────────────────── Progress bar ─────────────────────────
 
 struct CliProgress {
     pb: ProgressBar,
@@ -404,7 +404,7 @@ impl CliProgress {
     }
 }
 
-/// 进度条里只显示文件名的末尾部分。
+/// Shows only the tail of the file name in the progress bar.
 fn tail_chars(s: &str, n: usize) -> String {
     let count = s.chars().count();
     if count <= n {
@@ -604,9 +604,10 @@ fn cmd_scrub(a: ScrubArgs) -> CliResult {
     Ok(if failures > 0 { ExitCode::from(2) } else { ExitCode::SUCCESS })
 }
 
-/// `--line-buffered`：标准输入逐行打码，每批写完立即刷新。
+/// `--line-buffered`: masks stdin line by line and flushes after every batch.
 ///
-/// 不装 Ctrl-C 处理器：流式模式本来就靠 Ctrl-C 结束，已写出的行都刷新过了，按默认方式退出（130）即可。
+/// No Ctrl-C handler is installed: streaming mode is meant to be ended with Ctrl-C, every line written so far has
+/// already been flushed, so exiting the default way (130) is fine.
 fn scrub_line_buffered(a: &ScrubArgs, cfg: &JobConfig) -> CliResult {
     let cancel = &CancelToken::new();
     if a.inputs.len() != 1 || a.inputs[0].as_os_str() != "-" {
@@ -627,7 +628,7 @@ fn scrub_line_buffered(a: &ScrubArgs, cfg: &JobConfig) -> CliResult {
     };
     let stats = match result {
         Ok(s) => s,
-        // 下游提前关闭（例如接了 head）不算失败
+        // The downstream closing early (e.g. piped into head) isn't a failure
         Err(logblur_core::Error::Io { source, .. }) if source.kind() == io::ErrorKind::BrokenPipe => {
             return Ok(ExitCode::SUCCESS);
         }
@@ -663,7 +664,7 @@ fn cmd_preview(a: PreviewArgs) -> CliResult {
         let mut head = Vec::new();
         read_up_to(rd, &mut head, 1 << 20).map_err(|e| logblur_core::Error::io(meta.name.clone(), e))?;
         let text = logblur_core::text::decode_for_preview(&meta.name, &head).map(|mut s| {
-            // 只保留完整的行
+            // Keep only complete lines
             if let Some(i) = s.rfind('\n') {
                 s.truncate(i + 1);
             }
@@ -731,7 +732,7 @@ fn is_wide(c: char) -> bool {
         | 0xFFE0..=0xFFE6 | 0x20000..=0x3FFFD)
 }
 
-/// 按终端显示宽度补空格（中日韩字符占两格）。
+/// Pads with spaces by terminal display width (CJK characters take two columns).
 fn pad(s: &str, width: usize) -> String {
     let w: usize = s.chars().map(|c| if is_wide(c) { 2 } else { 1 }).sum();
     if w >= width { format!("{s} ") } else { format!("{s}{}", " ".repeat(width - w)) }
@@ -842,7 +843,7 @@ fn cmd_languages() -> CliResult {
 
 // ───────────────────────── bench ─────────────────────────
 
-/// 合成一段典型的 Linux 日志（含各种敏感信息）。
+/// Synthesizes a typical Linux log (with all kinds of sensitive information).
 fn synth_block(target: usize) -> Vec<u8> {
     let mut s = String::with_capacity(target + 512);
     let mut i = 0u64;

@@ -224,7 +224,7 @@ const BUILTIN_V4: &[([u8; 4], u8)] = &[
     ([127, 0, 0, 0], 8),
     ([255, 255, 255, 255], 32),
     ([224, 0, 0, 0], 4),
-    // 公共 DNS
+    // Public DNS
     ([8, 8, 8, 8], 32),
     ([8, 8, 4, 4], 32),
     ([1, 1, 1, 1], 32),
@@ -395,7 +395,7 @@ fn builtin_allowed(cat: Category, value: &str, keep_private: bool) -> bool {
                 .split([':', '-', '.'])
                 .flat_map(|p| (0..p.len() / 2).filter_map(move |i| u8::from_str_radix(&p[i * 2..i * 2 + 2], 16).ok()))
                 .collect();
-            // 只对单个 6 字节 MAC 放行；iptables 的 MAC= 序列（目标+源+类型）总要打码
+            // Only a single 6-byte MAC is allowed; the iptables MAC= sequence (dest + src + type) is always masked
             if hex.len() != 6 {
                 return false;
             }

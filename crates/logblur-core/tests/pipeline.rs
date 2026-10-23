@@ -1,4 +1,4 @@
-//! 端到端测试：构造压缩包 → 清洗 → 读回检查。
+//! End-to-end tests: build an archive → scrub → read it back and check.
 
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -62,11 +62,9 @@ fn read_zip(path: &Path) -> Vec<(String, Vec<u8>)> {
 }
 
 fn get(entries: &[(String, Vec<u8>)], name: &str) -> Vec<u8> {
-    entries
-        .iter()
-        .find(|(n, _)| n == name)
-        .map(|(_, v)| v.clone())
-        .unwrap_or_else(|| panic!("缺少条目 {name}，现有：{:?}", entries.iter().map(|(n, _)| n).collect::<Vec<_>>()))
+    entries.iter().find(|(n, _)| n == name).map(|(_, v)| v.clone()).unwrap_or_else(|| {
+        panic!("missing entry {name}, have: {:?}", entries.iter().map(|(n, _)| n).collect::<Vec<_>>())
+    })
 }
 
 fn job(input: &Path, output: Output, cfg: &JobConfig) -> Result<Report, Error> {
@@ -80,7 +78,7 @@ fn tag_cfg() -> JobConfig {
 
 fn assert_clean(text: &str, secrets: &[&str]) {
     for s in secrets {
-        assert!(!text.contains(s), "仍包含 {s:?}：\n{text}");
+        assert!(!text.contains(s), "still contains {s:?}:\n{text}");
     }
 }
 
@@ -115,13 +113,13 @@ fn zip_roundtrip() {
     let entries = read_zip(&out);
     let names: Vec<&str> = entries.iter().map(|(n, _)| n.as_str()).collect();
     assert!(names.contains(&"var/"), "{names:?}");
-    assert!(names.contains(&"home/[USER]/.bash_history"), "文件名应被清洗：{names:?}");
+    assert!(names.contains(&"home/[USER]/.bash_history"), "file names should be scrubbed: {names:?}");
 
     let auth = String::from_utf8(get(&entries, "var/log/auth.log")).unwrap();
     assert_clean(&auth, &["web-prod-01", "admin2", "203.0.113.45", "alice", "198.51.100.7"]);
     assert!(auth.contains("port 52234") && auth.contains("USER=root"));
 
-    // 第二个文件里没有上下文，靠第一遍学到的主机名和用户名
+    // The second file has no context; it relies on the hostname and username learned in pass 1
     let app = String::from_utf8(get(&entries, "var/log/app.log")).unwrap();
     assert_clean(&app, &["hunter2", "S3cret", "10.20.30.40", "web-prod-01", "alice"]);
     assert!(app.contains("backup host [HOST] finished for [USER]"), "{app}");
@@ -132,14 +130,14 @@ fn zip_roundtrip() {
 
     let cn = get(&entries, "var/log/cn.log");
     let (text, _, had_errors) = encoding_rs::GBK.decode(&cn);
-    assert!(!had_errors, "应保持 GBK 编码");
+    assert!(!had_errors, "should stay GBK-encoded");
     assert!(text.contains("用户张三 登录失败"));
     assert_clean(&text, &["13800138000", "203.0.113.7"]);
 
     let history = String::from_utf8(get(&entries, "home/[USER]/.bash_history")).unwrap();
     assert_clean(&history, &["alice", "203.0.113.9"]);
 
-    assert_eq!(get(&entries, "bin/blob.bin"), BLOB, "二进制条目应原样复制");
+    assert_eq!(get(&entries, "bin/blob.bin"), BLOB, "binary entry should be copied as is");
     assert_eq!(report.binary_entries, 1);
     assert!(report.matches_total > 10, "{report:?}");
     assert!(report.learn);
@@ -174,8 +172,12 @@ fn streaming_matches_whole_processing() {
 
     let a = fs::read_to_string(&whole_out).unwrap();
     let b = fs::read_to_string(&streamed_out).unwrap();
-    assert_eq!(a.lines().count(), big.lines().count() - 3 * 6, "每个 PEM 块（4 行）在 tag 模式下合并成 1 行");
-    assert!(a == b, "流式分块与整体处理的结果不同");
+    assert_eq!(
+        a.lines().count(),
+        big.lines().count() - 3 * 6,
+        "each PEM block (4 lines) collapses into 1 line in tag mode"
+    );
+    assert!(a == b, "streamed chunks and whole-input processing give different results");
     assert_clean(&a, &["203.0.113.", "MIIEowIBAAKCAQEA", "web-prod-01"]);
 }
 
@@ -223,7 +225,7 @@ fn zip_to_tar_gz_and_back() {
     }
     assert!(seen.iter().any(|p| p == "var/log/auth.log"), "{seen:?}");
 
-    // tar.gz 输入
+    // tar.gz input
     let again = d.path().join("again.tar.gz");
     job(&tgz, Output::Path(again.clone()), &tag_cfg()).unwrap();
     assert!(again.exists());

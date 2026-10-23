@@ -10,7 +10,7 @@ pub fn resolve(found: &mut Vec<Found>, prio: impl Fn(&Found) -> u32) {
     }
     found.sort_unstable_by(|a, b| a.start.cmp(&b.start).then(b.end.cmp(&a.end)).then(prio(a).cmp(&prio(b))));
     let mut out: Vec<Found> = Vec::with_capacity(found.len());
-    // 每个合并区间里「代表命中」的 (长度, 优先级)
+    // (length, priority) of the "representative hit" in each merged range
     let mut best: Vec<(usize, u32)> = Vec::with_capacity(found.len());
     for f in found.drain(..) {
         let len = f.end - f.start;
@@ -19,7 +19,7 @@ pub fn resolve(found: &mut Vec<Found>, prio: impl Fn(&Found) -> u32) {
             && f.start < last.end
         {
             last.end = last.end.max(f.end);
-            let b = best.last_mut().expect("与 out 同步");
+            let b = best.last_mut().expect("kept in sync with out");
             if len > b.0 || (len == b.0 && p < b.1) {
                 *b = (len, p);
                 last.category = f.category;

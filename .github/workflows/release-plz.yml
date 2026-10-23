@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  # 合并了 release PR 时：发布到 crates.io，打 tag 并创建 GitHub Release
+  # When a release PR has been merged: publish to crates.io, tag, and create the GitHub Release
   release:
     name: Release
     if: github.repository_owner == 'HiroGitea'
@@ -35,7 +35,7 @@ jobs:
           tag=$(jq -r '.[]? | select(.package_name == "logblur") | .tag' <<< "${RELEASES:-[]}")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-  # GITHUB_TOKEN 打的 tag 不会触发其他 workflow，所以在这里直接调用二进制构建
+  # Tags pushed with GITHUB_TOKEN don't trigger other workflows, so call the binary build directly here
   binaries:
     name: Binaries
     needs: release
@@ -46,7 +46,7 @@ jobs:
     with:
       tag: ${{ needs.release.outputs.tag }}
 
-  # 其他情况：创建或更新 release PR
+  # Otherwise: create or update the release PR
   release-pr:
     name: Release PR
     if: github.repository_owner == 'HiroGitea'

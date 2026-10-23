@@ -190,7 +190,7 @@ mod tests {
         let chunks = all_chunks(&text, 4096, 1000);
         assert_eq!(chunks.concat(), text);
         let holder = chunks.iter().find(|c| memmem::find(c, b"-----BEGIN").is_some()).unwrap();
-        assert!(memmem::find(holder, b"-----END").is_some(), "PEM 块被切开了");
+        assert!(memmem::find(holder, b"-----END").is_some(), "PEM block was split");
     }
 
     #[test]

@@ -50,50 +50,51 @@ fn is_masked(s: &str) -> bool {
 
 #[test]
 fn rule_fixtures() {
-    let fx: Fixtures = toml::from_str(include_str!("../../tests/fixtures/rules.toml")).expect("夹具文件应能解析");
+    let fx: Fixtures =
+        toml::from_str(include_str!("../../tests/fixtures/rules.toml")).expect("fixture file should parse");
     assert!(fx.case.len() >= 40);
     let mut failures = Vec::new();
     for c in &fx.case {
-        let engine = Engine::new(&cfg_for(c, MaskMode::Tag)).expect("引擎");
+        let engine = Engine::new(&cfg_for(c, MaskMode::Tag)).expect("engine");
         let out = engine.scrub_str(&c.input, &mut Counts::default());
         for m in &c.masked {
             if out.contains(m.as_str()) {
-                failures.push(format!("[{}] 仍包含 {m:?}\n    {out}", c.name));
+                failures.push(format!("[{}] still contains {m:?}\n    {out}", c.name));
             }
         }
         for k in &c.kept {
             if !out.contains(k.as_str()) {
-                failures.push(format!("[{}] 误删了 {k:?}\n    {out}", c.name));
+                failures.push(format!("[{}] wrongly removed {k:?}\n    {out}", c.name));
             }
         }
         for t in &c.tags {
             if !out.contains(&format!("[{t}]")) {
-                failures.push(format!("[{}] 缺少标签 [{t}]\n    {out}", c.name));
+                failures.push(format!("[{}] missing tag [{t}]\n    {out}", c.name));
             }
         }
 
-        // block 模式：字符数不变；再扫描一遍只会命中已经打码的部分
-        let block = Engine::new(&cfg_for(c, MaskMode::Block)).expect("引擎");
+        // Block mode: character count is unchanged; a second scan only hits already-masked parts
+        let block = Engine::new(&cfg_for(c, MaskMode::Block)).expect("engine");
         let masked = block.scrub_str(&c.input, &mut Counts::default());
         if masked.chars().count() != c.input.chars().count() {
-            failures.push(format!("[{}] block 模式改变了字符数", c.name));
+            failures.push(format!("[{}] block mode changed the character count", c.name));
         }
         let mut again = Vec::new();
         block.find(masked.as_bytes(), &mut again);
         for f in again {
             let text = String::from_utf8_lossy(&masked.as_bytes()[f.start..f.end]).into_owned();
             if !is_masked(&text) {
-                failures.push(format!("[{}] 再次扫描命中 {text:?}（{}）", c.name, block.rule_id(f.rule)));
+                failures.push(format!("[{}] second scan hit {text:?} ({})", c.name, block.rule_id(f.rule)));
             }
         }
     }
-    assert!(failures.is_empty(), "{} 处失败：\n{}", failures.len(), failures.join("\n"));
+    assert!(failures.is_empty(), "{} failure(s):\n{}", failures.len(), failures.join("\n"));
 }
 
 #[test]
 fn every_builtin_rule_compiles_at_level_4_with_timestamps() {
     let cfg = JobConfig { level: 4, enable: vec![Category::Timestamp], ..Default::default() };
-    let e = Engine::new(&cfg).expect("所有规则都应能编译");
+    let e = Engine::new(&cfg).expect("all rules should compile");
     assert_eq!(e.active_rule_count(), crate::rules::table::builtin().len());
 }
 
@@ -101,7 +102,7 @@ fn every_builtin_rule_compiles_at_level_4_with_timestamps() {
 fn rule_ids_are_unique() {
     let mut seen = HashSet::new();
     for r in crate::rules::table::builtin() {
-        assert!(seen.insert(r.id.to_string()), "重复的规则 id {}", r.id);
+        assert!(seen.insert(r.id.to_string()), "duplicate rule id {}", r.id);
     }
 }
 
@@ -181,7 +182,7 @@ fn custom_rules() {
         ..Default::default()
     };
     let e = Engine::new(&cfg).unwrap();
-    // emp 规则属于第 3 级的类别，在第 1 级不启用
+    // The emp rule belongs to a level-3 category, so it is not enabled at level 1
     assert_eq!(e.scrub_str("ORD-0123456789 emp_id=AB12345", &mut Counts::default()), "[REDACTED] emp_id=AB12345");
     let cfg3 = JobConfig { level: 3, ..cfg };
     let e3 = Engine::new(&cfg3).unwrap();

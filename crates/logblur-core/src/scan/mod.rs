@@ -102,7 +102,7 @@ impl Engine {
                 rules.push(Compiled { rule: r, re });
             }
         }
-        // 用户自定义规则
+        // User-defined rules
         for cr in &cfg.custom_rules {
             let cat = cr.category.unwrap_or(Category::Custom);
             let level = cr.level.unwrap_or(1);
@@ -121,7 +121,7 @@ impl Engine {
             rule.group = group;
             rules.push(Compiled { rule, re });
         }
-        // 拒绝名单：re: 开头的是正则，其余是字面量
+        // Deny list: entries starting with re: are regexes, the rest are literals
         let mut literals = Vec::new();
         if cfg.category_enabled(Category::Custom) {
             for (i, d) in cfg.deny.iter().enumerate() {
@@ -419,7 +419,7 @@ impl Engine {
             uniq.push((cat, v));
         };
         for (cat, v) in values {
-            // FQDN 的第一段（短主机名）也要学
+            // Also learn the first label of an FQDN (the short hostname)
             if cat == Category::Hostname
                 && v.contains('.')
                 && !v.bytes().all(|b| b.is_ascii_digit() || b == b'.')

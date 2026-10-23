@@ -94,7 +94,7 @@ where
     let mut batch: Vec<Vec<u8>> = Vec::new();
     let mut eof = false;
     while !eof {
-        // 阻塞等第一行，期间定期检查取消
+        // Block waiting for the first line, checking for cancellation periodically
         let first = loop {
             if cancel.is_cancelled() {
                 return Err(Error::Cancelled);
@@ -107,7 +107,7 @@ where
         };
         let Some(first) = first else { break };
 
-        // 再把已经到达的行一并取走，凑成一批
+        // Then take every line that has already arrived to form a batch
         batch.clear();
         let mut bytes = 0usize;
         let mut next = Some(first);
@@ -262,7 +262,7 @@ fn scrub_line(engine: &Engine, line: &[u8], wrap: Wrap, out: &mut Vec<u8>, count
     }
     let (content, ending) = line.split_at(len);
     let mask_char = engine.masker().mask_char();
-    // 补上合成的 BEGIN/END 标记单独扫描，再去掉标记
+    // Add synthetic BEGIN/END markers, scan on its own, then strip the markers
     let pre = if wrap.prefix { PEM_PREFIX } else { b"" };
     let suf = if wrap.suffix { PEM_SUFFIX } else { b"" };
     let hay = [pre, content, suf].concat();
@@ -271,7 +271,8 @@ fn scrub_line(engine: &Engine, line: &[u8], wrap: Wrap, out: &mut Vec<u8>, count
     if tmp.len() >= pre.len() + suf.len() && tmp.starts_with(pre) && tmp.ends_with(suf) {
         out.extend_from_slice(&tmp[pre.len()..tmp.len() - suf.len()]);
     } else {
-        // 标记被其他规则改写了（比如拒绝名单里有 PRIVATE），整行按私钥打码
+        // The markers were rewritten by another rule (e.g. PRIVATE is on the deny list);
+        // mask the whole line as a private key
         for _ in String::from_utf8_lossy(content).chars() {
             let mut b = [0; 4];
             out.extend_from_slice(mask_char.encode_utf8(&mut b).as_bytes());

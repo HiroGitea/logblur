@@ -241,7 +241,7 @@ impl Sink for ZipSink {
 
 // ───────────────────────── tar / tar.gz ─────────────────────────
 
-#[expect(clippy::large_enum_variant, reason = "每个输出只有一个实例，装箱没有收益")]
+#[expect(clippy::large_enum_variant, reason = "each output has a single instance, so boxing gains nothing")]
 enum TarOut {
     Plain(BufWriter<File>),
     Gz(GzEncoder<BufWriter<File>>),
@@ -406,7 +406,7 @@ impl Sink for TarSink {
     }
 }
 
-// ───────────────────────── 文件夹 ─────────────────────────
+// ───────────────────────── Folder ─────────────────────────
 
 pub struct DirSink {
     root: PathBuf,
@@ -506,9 +506,9 @@ impl Sink for DirSink {
     }
 }
 
-// ───────────────────────── 单文件 / .gz / stdout / 丢弃 ─────────────────────────
+// ───────────────────────── Single file / .gz / stdout / discard ─────────────────────────
 
-#[expect(clippy::large_enum_variant, reason = "每个输出只有一个实例，装箱没有收益")]
+#[expect(clippy::large_enum_variant, reason = "each output has a single instance, so boxing gains nothing")]
 enum OneOut {
     Plain(BufWriter<File>),
     Gz(GzEncoder<BufWriter<File>>),
