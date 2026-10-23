@@ -1,14 +1,21 @@
 name: Release
 
+# release-plz 发布后由 release-plz.yml 调用；手动推 v* tag 也会触发
 on:
   push:
     tags: ['v*']
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 env:
   CARGO_TERM_COLOR: always
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   build:
@@ -25,6 +32,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -32,7 +41,7 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          name="logblur-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          name="logblur-${TAG}-${{ matrix.target }}"
           mkdir "$name"
           ext=""
           [[ "${{ matrix.target }}" == *windows* ]] && ext=".exe"
@@ -62,6 +71,7 @@ jobs:
         run: sha256sum logblur-* > SHA256SUMS
       - uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ env.TAG }}
           files: |
             logblur-*
             SHA256SUMS

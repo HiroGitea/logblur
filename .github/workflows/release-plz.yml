@@ -1,0 +1,71 @@
+name: Release-plz
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # 合并了 release PR 时：发布到 crates.io，打 tag 并创建 GitHub Release
+  release:
+    name: Release
+    if: github.repository_owner == 'HiroGitea'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - id: release-plz
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - id: tag
+        env:
+          RELEASES: ${{ steps.release-plz.outputs.releases }}
+        run: |
+          tag=$(jq -r '.[]? | select(.package_name == "logblur") | .tag' <<< "${RELEASES:-[]}")
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  # GITHUB_TOKEN 打的 tag 不会触发其他 workflow，所以在这里直接调用二进制构建
+  binaries:
+    name: Binaries
+    needs: release
+    if: needs.release.outputs.tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+
+  # 其他情况：创建或更新 release PR
+  release-pr:
+    name: Release PR
+    if: github.repository_owner == 'HiroGitea'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

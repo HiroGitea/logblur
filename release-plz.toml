@@ -1,0 +1,26 @@
+# release-plz：合并到 main 后自动开「版本号 + CHANGELOG」PR，合并该 PR 即发布。
+# 三个 crate 共用一个版本；只给 logblur 打 tag、发 GitHub Release，CHANGELOG 汇总三个 crate 的改动。
+
+[workspace]
+release_always = false
+git_tag_enable = false
+git_release_enable = false
+changelog_update = false
+
+[[package]]
+name = "logblur"
+version_group = "logblur"
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+git_release_enable = true
+changelog_update = true
+changelog_path = "CHANGELOG.md"
+changelog_include = ["logblur-core", "logblur-gui"]
+
+[[package]]
+name = "logblur-core"
+version_group = "logblur"
+
+[[package]]
+name = "logblur-gui"
+version_group = "logblur"
