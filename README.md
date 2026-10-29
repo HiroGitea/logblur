@@ -230,7 +230,9 @@ $ ./target/release/logblur --version
 The project is split into three crates:
 
 * [`logblur-core`](crates/logblur-core): the library: rules, archive
-  handling and the scrubbing pipeline.
+  handling and the scrubbing pipeline. To scrub text your program already
+  holds, without the archive and compression dependencies, use only the
+  scanner: `logblur-core = { version = "0.2", default-features = false }`.
 * [`logblur`](crates/logblur): the command-line tool.
 * [`logblur-gui`](crates/logblur-gui): the desktop app (egui).
 

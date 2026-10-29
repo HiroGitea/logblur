@@ -1,4 +1,5 @@
 //! End-to-end tests: build an archive → scrub → read it back and check.
+#![cfg(feature = "archive")]
 
 use std::fs::{self, File};
 use std::io::{Read, Write};
