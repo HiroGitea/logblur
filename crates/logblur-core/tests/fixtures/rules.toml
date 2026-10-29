@@ -232,6 +232,39 @@ masked = ["Hunter2Secret", "hunter3"]
 kept = ["mysql -u root -p", "curl --password ", "db.acme-corp.internal"]
 
 [[case]]
+name = "short-option passwords"
+level = 1
+input = "sshpass -p Tr0ub4dor ssh bob@host; sshpass -pS3cr3t scp a b; redis-cli -h 10.0.0.9 -a myredispass ping; docker login -u bob -p Hunter2Docker registry.example"
+masked = ["Tr0ub4dor", "S3cr3t", "myredispass", "Hunter2Docker"]
+kept = ["sshpass -p ", "redis-cli -h", " -a ", " ping", "docker login -u bob -p ", "registry.example"]
+
+[[case]]
+name = "short options that are not passwords"
+level = 1
+input = "sshpass -f ~/.pw ssh host; ssh -p 2222 host; redis-cli -n 3 info; docker run -p 8080:80 nginx; podman ps -a"
+kept = ["-p 2222", "-n 3 info", "-p 8080:80", "ps -a"]
+
+[[case]]
+name = "webhook secrets"
+level = 1
+input = "SLACK_WEBHOOK=https://hooks.slack.com/services/T0000000/B0000000/XXXXXXXXXXXXXXXXXXXXXXXX DISCORD=https://discord.com/api/webhooks/123456789012345678/AbCdEfGhIjKlMnOpQrStUvWxYz012345"
+masked = ["T0000000/B0000000/XXXXXXXXXXXXXXXXXXXXXXXX", "AbCdEfGhIjKlMnOpQrStUvWxYz012345"]
+kept = ["hooks.slack.com/services/", "discord.com/api/webhooks/123456789012345678/"]
+
+[[case]]
+name = "cookies and session ids in environment variables"
+level = 1
+input = "KONSOLE_DBUS_ACTIVATION_COOKIE=b8f0c1d2e3a4f5b6c7d8e9f0a1b2c3d4 BRIDGE_SESSION_ID=Zk3mQ9xT2vLw8RpN XDG_SESSION_ID=2 session_id=c3"
+masked = ["b8f0c1d2e3a4f5b6c7d8e9f0a1b2c3d4", "Zk3mQ9xT2vLw8RpN"]
+kept = ["KONSOLE_DBUS_ACTIVATION_COOKIE=", "BRIDGE_SESSION_ID=", "XDG_SESSION_ID=2", "session_id=c3"]
+
+[[case]]
+name = "adjacent numbers are not a card"
+level = 2
+input = "bash scripts/build_when_ready.sh 202503 202610 16"
+kept = ["202503 202610 16"]
+
+[[case]]
 name = "command-line hosts at level 3"
 level = 3
 input = "bash[999]: mysql -u root -h db.acme-corp.internal; curl https://api.acme-corp.internal/v1"

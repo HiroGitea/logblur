@@ -151,6 +151,14 @@ pub fn builtin() -> Vec<Rule> {
         )
         .check(v::token_value),
         Rule::new(
+            "kv_cookie_session",
+            C::Token,
+            1,
+            "Cookies and session IDs under prefixed keys: KONSOLE_DBUS_ACTIVATION_COOKIE=…, BRIDGE_SESSION_ID=…",
+            r"(?i)(?:^|[^A-Za-z0-9])(?:[A-Za-z0-9]+[_\-])*(?:cookie|session[_\-]?id)[\x22']?[ \t]*[=:][ \t]*[\x22']?([^\s;&\x22',]{8,})",
+        )
+        .check(v::token_value),
+        Rule::new(
             "kv_secret",
             C::Password,
             1,
@@ -194,6 +202,21 @@ pub fn builtin() -> Vec<Rule> {
         )
         .check(v::secret_value),
         Rule::new(
+            "cli_short_password",
+            C::Password,
+            1,
+            "Passwords given as short options: sshpass -p …, redis-cli -a …, docker / podman login -p …",
+            concat!(
+                r"(?:^|[ \t/])(?:",
+                r"sshpass[ \t](?:[^\r\n;|&]*?[ \t])??-p[ \t]*([^\s\x22';\-][^\s\x22';]*)",
+                r"|(?:redis-cli|valkey-cli|keydb-cli)[ \t](?:[^\r\n;|&]*?[ \t])??-a[ \t]+([^\s\x22';\-][^\s\x22';]*)",
+                r"|(?:docker|podman|nerdctl|buildah|skopeo)[ \t]+login[ \t](?:[^\r\n;|&]*?[ \t])??-p[ \t]+([^\s\x22';\-][^\s\x22';]*)",
+                r")"
+            ),
+        )
+        .first_group()
+        .check(v::secret_value),
+        Rule::new(
             "uri_password",
             C::Password,
             1,
@@ -210,6 +233,14 @@ pub fn builtin() -> Vec<Rule> {
             r"(?i)[?&;](?:access_token|refresh_token|id_token|auth_token|token|auth|api_?key|apikey|key|secret|client_secret|password|passwd|pwd|sig|signature|x-amz-signature|x-amz-credential|x-amz-security-token|x-goog-signature|x-goog-credential|code|session|sessionid|sid|jwt|ticket|access_key|secret_key)=([^&#\s\x22'<>]+)",
         )
         .check(v::not_placeholder),
+        Rule::new(
+            "webhook_url",
+            C::Token,
+            1,
+            "Secret paths of Slack and Discord webhooks: hooks.slack.com/services/…, discord.com/api/webhooks/<id>/…",
+            r"(?i)(?:hooks\.slack\.com/(?:services|workflows|triggers)/([A-Za-z0-9_/\-]{8,})|discord(?:app)?\.com/api/webhooks/[0-9]+/([A-Za-z0-9_\-]{8,}))",
+        )
+        .first_group(),
         Rule::new(
             "azure_conn",
             C::Password,
