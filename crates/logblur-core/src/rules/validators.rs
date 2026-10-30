@@ -204,10 +204,22 @@ fn consistent_separators(s: &str) -> bool {
     true
 }
 
-/// Bank card: 13–19 digits, passes Luhn, consistent separators, not all the same digit.
+/// Separated card numbers are printed in groups of four (the last may be shorter) or as Amex 4-6-5 / 4-6-4; other
+/// groupings are separate numbers that happen to sit next to each other, such as `202503 202610 16`.
+fn card_grouping(s: &str) -> bool {
+    let groups: Vec<usize> = s.split(|ch: char| !ch.is_ascii_digit()).map(str::len).collect();
+    match groups.as_slice() {
+        [_] => true,
+        [4, 6, 4 | 5] => true,
+        [init @ .., last] => init.iter().all(|&n| n == 4) && (1..=4).contains(last),
+        [] => false,
+    }
+}
+
+/// Bank card: 13–19 digits, passes Luhn, consistent separators grouped like a card, not all the same digit.
 pub fn bank_card(c: &Cand) -> bool {
     let d = digits(c.payload);
-    if !(13..=19).contains(&d.len()) || !consistent_separators(c.payload) {
+    if !(13..=19).contains(&d.len()) || !consistent_separators(c.payload) || !card_grouping(c.payload) {
         return false;
     }
     if d.iter().all(|&x| x == d[0]) {
@@ -751,6 +763,9 @@ mod tests {
         assert!(!bank_card(&cand("4111 1111-1111 1111")));
         assert!(!bank_card(&cand("4111111111111112")));
         assert!(!bank_card(&cand("4444444444444444")));
+        assert!(bank_card(&cand("3782 822463 10005")));
+        assert!(bank_card(&cand("4111-1111-1111-1111-003")));
+        assert!(!bank_card(&cand("202503 202610 16")));
     }
 
     #[test]

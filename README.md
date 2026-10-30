@@ -54,7 +54,7 @@ Oct 23 11:02:44 HOST_4eq4e4is bash[999]: mysql -u root -pPWD_v3565g2m -h HOST_k2
 * Nothing unscrubbed touches the disk. There is no "extract to a temp
   directory" step to forget to clean up.
 * It knows what Linux logs look like: sshd, PAM, sudo, cron, systemd, the kernel,
-  wpa_supplicant, web server access logs and shell history, with 75 rules in 31
+  wpa_supplicant, web server access logs and shell history, with 78 rules in 31
   categories.
 * It learns. A first pass collects the user and host names it finds in
   well-understood places (such as `Accepted publickey for alice`) and then masks
