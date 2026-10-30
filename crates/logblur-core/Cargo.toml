@@ -12,25 +12,42 @@ readme.workspace = true
 keywords.workspace = true
 categories = ["text-processing", "compression"]
 
+[features]
+default = ["archive"]
+# Archives, files, streams, reports and the job runner. Without it only the scanner is built: Engine, rules, masking
+# and configuration, for programs that scrub text they already hold in memory.
+archive = [
+    "dep:encoding_rs",
+    "dep:chardetng",
+    "dep:zip",
+    "dep:flate2",
+    "dep:tar",
+    "dep:crossbeam-channel",
+    "dep:sysinfo",
+    "dep:serde_json",
+    "dep:tempfile",
+    "dep:crc32fast",
+]
+
 [dependencies]
 regex = "1.13"
 aho-corasick = "1.1"
 memchr = "2.7"
-encoding_rs = { version = "0.8.42", features = ["fast-legacy-encode"] }
-chardetng = "1.0"
-zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2-zlib-rs", "deflate64", "bzip2", "lzma", "xz"] }
-flate2 = { version = "1.1", default-features = false, features = ["zlib-rs", "runtime_detection"] }
-tar = { version = "0.4.46", default-features = false }
-crossbeam-channel.workspace = true
-sysinfo = { version = "0.39", default-features = false, features = ["system"] }
+encoding_rs = { version = "0.8.42", features = ["fast-legacy-encode"], optional = true }
+chardetng = { version = "1.0", optional = true }
+zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2-zlib-rs", "deflate64", "bzip2", "lzma", "xz"], optional = true }
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs", "runtime_detection"], optional = true }
+tar = { version = "0.4.46", default-features = false, optional = true }
+crossbeam-channel = { workspace = true, optional = true }
+sysinfo = { version = "0.39", default-features = false, features = ["system"], optional = true }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", optional = true }
 toml = "1.1"
 sha2 = "0.10"
-tempfile = "3.27"
+tempfile = { version = "3.27", optional = true }
 regex-syntax = "0.8.11"
 regex-automata = "0.4.18"
-crc32fast = "1.5.3"
+crc32fast = { version = "1.5.3", optional = true }
 
 [dev-dependencies]
 tempfile = "3.27"

@@ -177,7 +177,7 @@ $ ./target/release/logblur --version
 
 项目由三个 crate 组成：
 
-* [`logblur-core`](crates/logblur-core)：核心库，包含规则、压缩包读写和脱敏流水线。
+* [`logblur-core`](crates/logblur-core)：核心库，包含规则、压缩包读写和脱敏流水线。只想清洗程序内存里已有的文本、不要压缩包相关依赖时，只用扫描器：`logblur-core = { version = "0.2", default-features = false }`。
 * [`logblur`](crates/logblur)：命令行工具。
 * [`logblur-gui`](crates/logblur-gui)：桌面应用（基于 egui）。
 
