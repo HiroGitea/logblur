@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/HiroGitea/logblur/compare/v0.2.1...v0.2.2) - 2026-10-30
+
+### Added
+
+- build only the scanner without the archive feature ([#9](https://github.com/HiroGitea/logblur/pull/9))
+
+### Fixed
+
+- catch short-option passwords, webhook secrets and session cookies ([#8](https://github.com/HiroGitea/logblur/pull/8))
+- catch --machine-id options and UUIDs after a hyphenated word ([#11](https://github.com/HiroGitea/logblur/pull/11))
+
 ## [0.2.1](https://github.com/HiroGitea/logblur/compare/v0.2.0...v0.2.1) - 2026-10-23
 
 ### Fixed
