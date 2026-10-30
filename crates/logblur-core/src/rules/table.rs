@@ -628,8 +628,8 @@ pub fn builtin() -> Vec<Rule> {
             "uuid",
             C::Uuid,
             3,
-            "UUIDs / GUIDs (disks, partitions, boot IDs and more)",
-            r"(?:^|[^0-9A-Za-z\-])([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+            "UUIDs / GUIDs (disks, partitions, boot IDs and more), also after a word and a hyphen: auth-<uuid>",
+            r"(?:^|[^0-9A-Za-z\-]|[G-Zg-z_]-)([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
         )
         .after(v::after_not_alnum)
         .check(v::uuid),
@@ -637,8 +637,8 @@ pub fn builtin() -> Vec<Rule> {
             "machine_id",
             C::MachineId,
             3,
-            "machine-id / boot-id / device IDs: _MACHINE_ID=…, machine-id: …, android_id=…",
-            r"(?i)(?:^|[^A-Za-z0-9])_?(?:machine[_\-]?id|boot[_\-]?id|invocation[_\-]?id|product[_\-]?uuid|system[_\-]?uuid|hardware[_\-]?uuid|dmi[_\-]?uuid|device[_\-]?id|android[_\-]?id|advertising[_\-]?id|idfa|idfv|instance[_\-]?id)[\x22']?(?:[ \t]*[:：][ \t]*|[ \t]+=[ \t]+|=)[\x22']?([0-9A-Za-z][0-9A-Za-z\-]{7,63})",
+            "machine-id / boot-id / device IDs: _MACHINE_ID=…, machine-id: …, android_id=…, --machine-id …",
+            r"(?i)(?:^|[^A-Za-z0-9])(?:_?(?:machine[_\-]?id|boot[_\-]?id|invocation[_\-]?id|product[_\-]?uuid|system[_\-]?uuid|hardware[_\-]?uuid|dmi[_\-]?uuid|device[_\-]?id|android[_\-]?id|advertising[_\-]?id|idfa|idfv|instance[_\-]?id)[\x22']?(?:[ \t]*[:：][ \t]*|[ \t]+=[ \t]+|=)|--(?:machine|boot|invocation|device|instance)-id[ \t]+)[\x22']?([0-9A-Za-z][0-9A-Za-z\-]{7,63})",
         )
         .check(v::not_placeholder)
         .learn(),
