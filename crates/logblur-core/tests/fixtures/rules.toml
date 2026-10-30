@@ -361,3 +361,38 @@ level = 3
 input = "peers: a.acme-corp.dev b.acme-corp.cloud c.acme-corp.company d.acme-corp.group e.acme-corp.services f.acme-corp.intranet g.acme-corp.localnet h.acme-corp.mobi"
 masked = ["a.acme-corp.dev", "b.acme-corp.cloud", "c.acme-corp.company", "d.acme-corp.group", "e.acme-corp.services", "f.acme-corp.intranet", "g.acme-corp.localnet", "h.acme-corp.mobi"]
 kept = ["peers: "]
+
+[[case]]
+name = "machine-id given as a command-line option"
+level = 3
+input = "dbus-broker --log 11 --controller 10 --machine-id 0f1e2d3c4b5a69788796a5b4c3d2e1f0 --max-bytes 100000000000000"
+masked = ["0f1e2d3c4b5a69788796a5b4c3d2e1f0"]
+kept = ["dbus-broker --log 11 --controller 10 --machine-id", "--max-bytes 100000000000000"]
+tags = ["MACHINE_ID"]
+
+[[case]]
+name = "boot-id option with a UUID"
+level = 3
+input = "collector --boot-id 8b2c7d4e-1f3a-4b5c-9d6e-7f8a9b0c1d2e --verbose"
+masked = ["8b2c7d4e-1f3a-4b5c-9d6e-7f8a9b0c1d2e"]
+kept = ["collector --boot-id", "--verbose"]
+
+[[case]]
+name = "machine-id option needs a long value"
+level = 3
+input = "tool --machine-id auto --device-id 1"
+kept = ["--machine-id auto", "--device-id 1"]
+
+[[case]]
+name = "UUID after a word and a hyphen"
+level = 3
+input = "/usr/lib/plasmalogin-helper --socket /tmp/plasmalogin-auth-ce8544d3-3a6b-4f08-9a5a-715a4f1760c8 --id 1"
+masked = ["ce8544d3-3a6b-4f08-9a5a-715a4f1760c8"]
+kept = ["/tmp/plasmalogin-auth-", "--socket", "--id 1"]
+tags = ["UUID"]
+
+[[case]]
+name = "UUID-like run inside a longer hex chain is not split"
+level = 3
+input = "id=abcdef12-ce8544d3-3a6b-4f08-9a5a-715a4f1760c8"
+kept = ["abcdef12-ce8544d3-3a6b-4f08-9a5a-715a4f1760c8"]
